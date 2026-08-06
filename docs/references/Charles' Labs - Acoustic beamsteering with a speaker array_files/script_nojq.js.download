@@ -1,0 +1,8 @@
+var myNav = document.getElementById('mainNav');
+window.onscroll = function () { 
+    if (window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0 >= 50 ) {
+        myNav.classList.add("whiteBG");
+    } else {
+        myNav.classList.remove("whiteBG");
+    }
+};
