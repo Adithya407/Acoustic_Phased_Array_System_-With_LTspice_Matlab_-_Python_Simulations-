@@ -1,81 +1,126 @@
-# Acoustic Phased-Array System
+# RP2040 True-Time-Delay Audio Phased Array Beamformer
 
-A 6-element acoustic phased array that steers the direction of maximum sound intensity in real time using true time-delay beamforming on an RP2040 microcontroller. Built as an Open Laboratory I project (Dept. of ECE, Amrita Vishwa Vidyapeetham, Coimbatore), 2026–27 Odd semester.
+A 6-element speaker array driven by an RP2040 microcontroller, designed to quantitatively benchmark true-time-delay (TTD) beam steering against phase-only steering across the audible frequency band. This project characterizes both the TTD-vs-phase-only performance gap and how much of the ideal continuous-delay advantage survives when delays are quantized to discrete samples on real embedded hardware.
 
-## Overview
+---
 
-Traditional beam steering shifts the phase of a single frequency to redirect a wavefront, but that only works correctly at the one frequency it was tuned for. This project instead applies a **true time delay** between speaker channels, which — unlike single-frequency phase shifting — keeps the beam direction essentially constant across a wide audio band. The steering math is derived from the standard N-element array / diffraction-grating model, converted from a phase term (Φ) to a frequency-independent delay term (t_d):
+## Motivation
 
-```
-θ = sin⁻¹( -v_s / (2πd) · t_d )
-```
+Phased arrays steer radiated energy by controlling the relative timing or phase of signals fed to each element. In narrowband RF systems, a simple per-element phase shift suffices because the signal occupies a small fractional bandwidth. Audio, however, spans roughly three decades (20 Hz – 20 kHz), making it inherently wideband. A fixed phase offset that correctly steers a 1 kHz tone will mis-steer a 4 kHz tone — a phenomenon called **beam squint**. True time delay eliminates beam squint in principle, since a constant group delay shifts all frequency components by the same spatial angle. But on a low-cost microcontroller the available delay is quantized to the sample period (e.g., ~22.7 µs at 44.1 kHz), introducing its own steering errors. No published work on low-cost MCU-based audio arrays has quantified the three-way gap between ideal continuous-delay TTD, sample-quantized TTD, and phase-only steering. This project fills that gap.
 
-where `v_s` is the speed of sound and `d` is the inter-speaker spacing. This relationship is implemented in firmware and cross-checked against a MATLAB simulation of the array's far-field intensity pattern.
+## Research Questions
+
+1. **TTD vs. phase-only:** How much does true-time-delay steering outperform phase-only steering in main-lobe consistency and sidelobe suppression across the audio band on the same hardware?
+2. **Ideal vs. real TTD:** How closely does sample-quantized TTD (limited by a 44.1 kHz sample rate) approach the ideal continuous-delay TTD ceiling, and at what frequencies and steering angles does the quantization penalty become significant?
+3. **Simulation-to-hardware fidelity:** Can a MATLAB/Simulink simulation-first workflow accurately predict measured beam patterns from a physical RP2040 array?
+
+## Three-Condition Benchmarking Framework
+
+The core experimental methodology compares three steering conditions on the same 6-element linear array, using identical element spacing, amplification, and measurement environment:
+
+| Condition | Delay Mechanism | Resolution | Expected Behavior |
+|---|---|---|---|
+| **Ideal TTD** (simulation ceiling) | Continuous, arbitrary-precision delay | Infinite | Frequency-invariant steering; beam squint = 0 |
+| **Hardware TTD** (RP2040) | Sample-domain integer-delay buffer | 1 / f_s ≈ 22.7 µs | Near-ideal at low frequencies; quantization-limited at high frequencies and steep angles |
+| **Phase-only** (control) | Per-element phase rotation at a design frequency | Continuous phase, single-frequency optimum | Correct at the design frequency; increasing squint away from it |
 
 ## System Architecture
 
-### Hardware signal chain
+### Hardware
+
+- **Microcontroller:** Raspberry Pi RP2040 (dual Cortex-M0+ at 133 MHz)
+  - Programmable I/O (PIO) state machines for deterministic, jitter-free sample output
+  - DMA channels for zero-CPU-overhead data transfer between memory and peripherals
+- **Speaker elements:** 6 equally spaced full-range drivers in a uniform linear array
+- **DAC interface:** I2S or parallel DAC output per channel, clocked at 44.1 kHz
+- **Amplification:** Per-channel speaker amplifier stages with low-pass reconstruction filters to suppress DAC quantization noise
+- **Input:** Standard line-level audio input, biased and amplified to span the ADC range
+- **Steering control:** Potentiometer or serial interface to set the desired beam angle in real time
+
+### Signal Flow
 
 ```
-Standard Audio Input → Input Buffer / Level Shifter → TI ADC
-                                                          ↓
-                          Speaker Amp (×6) ← MCP4728 DAC ← RP2040 Microcontroller
+Audio Source → ADC → RP2040 Sample Buffer → Per-Channel Delay Line → DAC × 6 → Amplifiers → Speakers
+                                                    ↑
+                                         Steering Angle Input
 ```
 
-- Audio input is re-biased and amplified from a ±1 V line-level signal to the 0–5 V range needed by the ADC.
-- The RP2040 reads the digitized input, computes the per-channel time-delay values for the target steering angle, and writes each channel out to a pair of MCP4728 DACs.
-- Each DAC output passes through a speaker amplifier stage that low-pass filters (removing DAC quantization noise) and buffers the signal (to drive the 8 Ω speaker load) before reaching the speaker.
+Each channel's delay line is a circular buffer in RAM. The steering-angle input sets the inter-element delay Δτ, which determines the progressive delay applied to successive speakers. For TTD mode, each channel's read pointer is offset by an integer number of samples corresponding to the required delay. For phase-only mode, the same hardware applies a frequency-dependent phase rotation computed at a single design frequency.
 
-### Firmware design
+### Software / Firmware
 
-- **Core 0** samples a potentiometer (used as the steering-angle user interface), computes the corresponding per-channel time delays, and writes them into a double buffer.
-- **Core 1** is triggered by a 44.1 kHz DMA timer, swaps to the current buffer, and streams the delayed samples out to the DACs over two parallel high-speed I²C (PIO) channels — 4 channels per MCP4728, 6 of the available 8 channels used.
-- Double buffering with a buffer-swap sync between cores keeps audio capture/playback glitch-free at the 44.1 kHz interrupt rate.
+- **Real-time ISR or DMA pipeline:** Samples captured and played back at 44.1 kHz, satisfying the Nyquist criterion for the ~20 kHz upper bound of human hearing
+- **Delay computation:** Main loop reads the steering-angle input, computes the per-element delay in samples, and updates the buffer read offsets — all between ISR deadlines
+- **MATLAB/Simulink model:** Full array simulation (element pattern, array factor, steering response) used to predict beam patterns before hardware fabrication; simulation parameters match physical geometry exactly
 
-## Hardware
+## Prior Work and Literature Context
 
-| Component | Spec | Qty |
+This project builds on and extends two threads of prior work:
+
+### Beamformer Theory (not embedded-hardware-focused)
+
+- **Luo (2024)** — Constant directivity loudspeaker beamforming with frequency-regularized Rayleigh quotient optimization for heterogeneous speaker arrays
+- **Zhang, Xiang & Zhu (2024)** — Steerable frequency-invariant differential beamforming for loudspeaker line arrays (300 Hz – 4 kHz) using Jacobi–Anger modal matching; validated in anechoic chamber (Sensors 24, 6277)
+- **Pope et al. (2024)** — Phased array systems design considerations and demonstration for RF applications, covering analog/digital/hybrid architectures, beam-weight synthesis, and calibration
+
+These works establish the theoretical framework for wideband beam steering and frequency-invariant pattern design, but target full-size or RF-domain arrays — not resource-constrained embedded audio hardware.
+
+### MCU-Driven Audio Arrays (hobbyist / course-level)
+
+- **Szoka & Jackson (2012)** — 12-element ATmega644 speaker array sampled at 44.1 kHz using true time delay (group delay in the sample domain); closest direct hardware precedent. They explicitly considered and rejected FFT-based phase steering as too computationally expensive for real-time MCU execution. (Cornell ECE 4760 Final Project)
+- **Grassin (2020)** — 12-speaker Arduino Nano array using phase and amplitude steering; demonstrated measured polar patterns at a single tone (~750 Hz–1 kHz) with open-source hardware and Python code generation. (Charles' Labs)
+
+Neither precedent performed a quantitative multi-frequency comparison of TTD vs. phase-only steering, nor characterized the sample-quantization penalty of the delay implementation.
+
+### What This Project Adds
+
+- The **first published three-condition benchmark** (ideal TTD ceiling vs. hardware TTD vs. phase-only) for a low-cost MCU audio array
+- **Quantitative characterization** of the sample-quantization gap — how much of the ideal continuous-delay TTD advantage is lost at the RP2040's 44.1 kHz sample rate
+- A **simulation-first, hardware-validated workflow** coupling MATLAB/Simulink modeling with physical RP2040 measurements
+
+## Project Structure
+
+```
+├── firmware/              # RP2040 C/C++ firmware (PIO programs, DMA config, delay-line logic)
+├── simulation/            # MATLAB/Simulink array models and beam pattern scripts
+├── hardware/              # KiCad schematics and PCB layouts for amplifier and DAC boards
+├── measurements/          # Captured polar-pattern data and analysis notebooks
+├── docs/                  # Presentation slides, project reports, and reference PDFs
+│   ├── references/        # Literature PDFs and annotated sources
+│   └── presentation/      # R1_Presentation.pptx and supporting materials
+└── README.md
+```
+
+## Key Design Parameters
+
+| Parameter | Value | Rationale |
 |---|---|---|
-| Microcontroller | Raspberry Pi RP2040 | 1 |
-| DAC | MCP4728 (I²C, quad-channel) | 2 |
-| Speaker | PUI Audio AS07108PO-3-R, 8 Ω, 86 dB sensitivity, 100 Hz–20 kHz | 6 |
-| ADC | Texas Instruments ADC | 1 |
-| Op-amps | Quad op-amp (input buffer / re-bias stage) | 3 |
-| Transistors / MOSFETs | NPN / NMOS (amp/buffer stages) | 12 each |
-| Potentiometer | 10 kΩ (steering angle UI) | 1 |
-| Audio jack | 3.5 mm | 1 |
+| Number of elements (N) | 6 | Balances cost, wiring complexity, and sufficient array gain for proof-of-concept |
+| Sample rate (f_s) | 44.1 kHz | Standard audio rate; Nyquist-compliant for full audible band |
+| Delay resolution | 1 / 44100 ≈ 22.7 µs | Inherent sample-period quantization; sets the minimum resolvable inter-element delay |
+| MCU clock | 133 MHz | RP2040 default; provides ample headroom for 6-channel ISR within the 22.7 µs budget |
+| Target steering range | ±55° from broadside | Matches the angular range where a 6-element linear array maintains useful directivity |
 
-The speaker was selected from four candidates (Dayton Audio CE36-8, PUI Audio AS03208MS-3-R, Challenge Electronics CS32-03W23-16-1X, PUI Audio AS07108PO-3-R) as the only option meeting the 86 dB sensitivity target exactly, with full datasheet documentation and extended low-frequency response for better full-range array reproduction.
+## Future Scope
 
-## Why a microcontroller (not discrete hardware)
-
-Generating a live, continuously-adjustable per-channel time delay against a live-sampled waveform is fundamentally an arithmetic/sequencing task rather than a fixed signal-conditioning one. A discrete alternative (e.g., bucket-brigade delay-line ICs with separate clocking per tap) doesn't add meaningful hardware design value — it just swaps one IC-based subsystem for another — and introduces companding noise and clock-feedthrough distortion that works against the array's audio quality goals.
-
-## Status / Roadmap
-
-- [x] Proposal accepted — Open Laboratory I, Review Zero
-- [ ] MATLAB verification of the frequency-independence of the time-delay steering model
-- [ ] Hardware bring-up (ADC/DAC signal chain, amplifier stages)
-- [ ] RP2040 dual-core firmware (sampling, delay computation, DMA/PIO output)
-- [ ] Full 6-speaker array integration and beam-pattern testing
-- [ ] Future scope: ultrasound-modulated audio (parametric speaker / "sound from ultrasound") extension
-- [ ] Open Laboratory II: convert proposal into a finished product
+- **Increased element count:** Scaling to 12+ elements for narrower main lobes and deeper nulls, following the precedent set by Szoka & Jackson (12 elements) and Grassin (12 elements)
+- **2D planar array:** Extending from a 1D linear array to a 2D grid for azimuth + elevation steering
+- **Ultrasound-modulated audio (parametric array loudspeaker):** Exploiting the Berktay self-demodulation effect to generate highly directional audible sound from an ultrasonic carrier — requires predistortion of the modulating signal and would target Open Lab II hardware with ultrasonic transducers
+- **Higher sample rates:** Moving to 96 kHz or 192 kHz to halve or quarter the delay quantization step, directly reducing the ideal-vs-real TTD gap
+- **Adaptive beamforming:** Implementing real-time beam tracking via microphone feedback and direction-of-arrival estimation
 
 ## References
 
-1. Y. Luo, "Constant Directivity Loudspeaker Beamforming," 2024. arXiv:2407.01860v3.
-2. C. Pope, H. Tang, B. Zheng and H. Zhang, "Phased Array Systems – Design Considerations & System Demonstration," 2024 IEEE International Symposium on Phased Array Systems and Technology (ARRAY), Boston, MA, USA, 2024, pp. 1-8, doi: 10.1109/ARRAY58370.2024.10880346.
-3. B. Rafaely and D. Khaykin, "Optimal model-based beamforming and independent steering for spherical loudspeaker arrays," IEEE Transactions on Audio, Speech, and Language Processing, 2011. arXiv:2310.04202.
-4. Zhuang, T., Zhong, J.-X., & Lu, J. (2024). The feasibility of sound zone control using an array of parametric array loudspeakers. arXiv preprint arXiv:2407.10054.
-5. D. de Groot, B. Karslioglu, O. Scharenborg, and J. Martinez, "Loudspeaker Beamforming to Enhance Speech Recognition Performance of Voice Driven Applications," arXiv:2501.08104 [eess.AS], Jan. 2025.
-6. A. Da Silva Gaviola, M. Rivai and H. Kusuma, "Audio beam steering with phased array method using Arduino Due Microcontroller," 2018 International Conference on Information and Communications Technology (ICOIACT), Yogyakarta, Indonesia, 2018, pp. 597-600, doi: 10.1109/ICOIACT.2018.8350683.
-
-Hardware reference design: *Phased Array Speaker System* — Edward Szoka & Tom Jackson, Cornell ECE 4760.
-
-## Team
-
-Batch 1, Open Laboratory I & II, Dept. of ECE, Amrita Vishwa Vidyapeetham, Coimbatore — 4 members.
+1. Y. Luo, "Constant Directivity Loudspeaker Beamforming," Amazon Inc., 2024.
+2. L. Pope et al., "Phased Array Systems: Design Considerations & System Demonstration," in *Proc. IEEE Int. Symp. Phased Array Syst. & Technol.*, 2024.
+3. Y. Zhang, Q. Xiang, and Q. Zhu, "Design of Differential Loudspeaker Line Array for Steerable Frequency-Invariant Beamforming," *Sensors*, vol. 24, no. 19, art. 6277, 2024. DOI: [10.3390/s24196277](https://doi.org/10.3390/s24196277)
+4. E. Szoka and T. Jackson, "Phased Array Speaker System," ECE 4760 Final Project, Cornell University, Spring 2012. [Online]. Available: [https://people.ece.cornell.edu/land/courses/ece4760/FinalProjects/s2012/tcj26_ecs227/tcj26_ecs227/index.html](https://people.ece.cornell.edu/land/courses/ece4760/FinalProjects/s2012/tcj26_ecs227/tcj26_ecs227/index.html)
+5. C. Grassin, "Acoustic Beamsteering with a Speaker Array," Charles' Labs, Mar. 2020. [Online]. Available: [https://charleslabs.fr/en/project-Acoustic+beamsteering+with+a+speaker+array](https://charleslabs.fr/en/project-Acoustic+beamsteering+with+a+speaker+array)
 
 ## License
 
-TBD.
+This project is developed as part of an academic capstone / open lab research effort. See individual subdirectories for applicable licenses on third-party components.
+
+---
+
+*Built with an RP2040, six speakers, and a stubborn refusal to let beam squint go unquantified.*
