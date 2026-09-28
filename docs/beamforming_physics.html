@@ -1,0 +1,719 @@
+<title>Delay-Steered Speaker Array</title>
+<meta name="description" content="Physics, derivations and interactive simulations for the RP2040 true-time-delay speaker array.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap">
+<style>
+:root{
+  --bg:#F4F6F7;--surface:#FFFFFF;--surface-2:#EAEFF2;--ink:#172026;--muted:#53616B;--faint:#8794A0;--rule:#D3DBE0;
+  --accent:#C4502F;--accent-soft:#F7E4DC;--blue:#2F6FA8;--blue-soft:#E1ECF6;--teal:#16836A;--violet:#6A5FC8;--amber:#A8690F;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4",Georgia,"Times New Roman",serif;--mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1317;--surface:#161C21;--surface-2:#1E262D;--ink:#E3E8EC;--muted:#9CA8B2;--faint:#6C7883;--rule:#29323A;
+  --accent:#E7795A;--accent-soft:#35231D;--blue:#6EA6DA;--blue-soft:#1A2835;--teal:#4CC3A0;--violet:#9C94EA;--amber:#E0A447;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F1317;--surface:#161C21;--surface-2:#1E262D;--ink:#E3E8EC;--muted:#9CA8B2;--faint:#6C7883;--rule:#29323A;
+  --accent:#E7795A;--accent-soft:#35231D;--blue:#6EA6DA;--blue-soft:#1A2835;--teal:#4CC3A0;--violet:#9C94EA;--amber:#E0A447;color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.7 var(--sans);padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:210px minmax(0,1fr);gap:48px}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:40px;font-size:13px;line-height:1.5}
+nav.toc p{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:0 0 10px}
+nav.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:6px;counter-reset:t}
+nav.toc li{counter-increment:t;display:grid;grid-template-columns:22px 1fr}
+nav.toc li::before{content:counter(t);color:var(--faint);font-family:var(--mono);font-size:12px}
+nav.toc a{color:var(--muted);text-decoration:none}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent)}
+main{max-width:800px;min-width:0}
+header.hero{padding:48px 0 28px;border-bottom:1px solid var(--rule);margin-bottom:12px}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.06em;color:var(--accent);text-transform:uppercase;margin:0 0 14px}
+h1{font:600 clamp(32px,5vw,46px)/1.1 var(--serif);margin:0 0 14px;text-wrap:balance;letter-spacing:-.01em}
+.lede{font-size:18px;color:var(--muted);max-width:62ch;margin:0 0 22px}
+.spec{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.spec li{font:13px/1 var(--mono);padding:8px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--surface);color:var(--muted)}
+.spec b{color:var(--ink);font-weight:500}
+section{padding:36px 0 8px;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:0}
+h2{font:600 28px/1.2 var(--serif);margin:0 0 6px;text-wrap:balance;display:flex;gap:14px;align-items:baseline}
+h2 .n{font:500 14px var(--mono);color:var(--accent)}
+h3{font:600 19px/1.3 var(--serif);margin:28px 0 6px;text-wrap:balance}
+p{margin:0 0 14px;max-width:68ch}
+.sub{color:var(--muted);margin-bottom:18px}
+a{color:var(--blue)}
+code{font:14px var(--mono);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+.eq{overflow-x:auto;margin:6px 0 16px;padding:4px 0}
+.result{border:1px solid var(--accent);background:var(--accent-soft);border-radius:8px;padding:14px 18px;margin:8px 0 18px}
+.result p{margin:0 0 6px}.result p:last-child{margin:0}
+.note{border-left:3px solid var(--blue);padding:4px 0 4px 16px;margin:8px 0 18px;color:var(--muted);border-radius:0}
+.tbl{overflow-x:auto;margin:8px 0 20px}
+table{border-collapse:collapse;font-size:14px;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.03em;border-bottom:1px solid var(--faint)}
+tr.hl td{background:var(--accent-soft)}
+td.num,th.num{text-align:right}
+pre{font:13px/1.6 var(--mono);background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:14px 16px;overflow-x:auto;margin:8px 0 18px}
+figure{margin:12px 0 22px}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.fig{width:100%;height:auto;display:block;background:var(--surface);border:1px solid var(--rule);border-radius:8px}
+.fig text{font:12px var(--sans);fill:var(--muted)}
+.fig .ln{stroke:var(--faint);stroke-width:1;fill:none}
+.fig .dash{stroke-dasharray:4 3}
+.fig .acc{stroke:var(--accent);fill:none}
+.fig .blu{stroke:var(--blue);fill:none}
+.fig .amb{stroke:var(--amber);fill:none}
+.fig .el{fill:var(--surface-2);stroke:var(--faint);stroke-width:1}
+.fig .bar{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1}
+.fig .dot{fill:var(--accent)}
+.mk-acc{fill:none;stroke:var(--accent);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.mk-mut{fill:none;stroke:var(--faint);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.widget{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:18px;margin:14px 0 24px}
+.wtitle{font:500 12px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 20px;margin-bottom:12px}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);gap:8px}
+.ctl label span:last-child{font-family:var(--mono);color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.seg button,.btn{font:inherit;font-size:13px;padding:6px 12px;border-radius:6px;border:1px solid var(--rule);background:var(--bg);color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.seg button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.panes{display:flex;flex-wrap:wrap;gap:16px}
+.pane{flex:1 1 300px;min-width:0}
+canvas{width:100%;display:block}
+.wcap{font-size:12px;color:var(--faint);margin:4px 0 0;line-height:1.5;max-width:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px}
+.stat{background:var(--bg);border-radius:6px;padding:8px 10px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font:500 15px var(--mono);color:var(--ink)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill{font:12px var(--mono);padding:4px 8px;border-radius:6px;background:var(--bg);color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:18px;border-top:2px solid}
+.box{display:inline-block;width:14px;height:10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:10px 0 20px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:14px 16px}
+.card h4{margin:0 0 6px;font:500 12px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.card .big{font:600 24px/1.2 var(--serif);color:var(--ink)}
+.card p{font-size:13px;color:var(--muted);margin:4px 0 0}
+footer{color:var(--faint);font-size:13px;padding-top:28px}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;gap:0}nav.toc{position:static;padding-top:24px}nav.toc ol{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+html{scroll-behavior:smooth}
+</style>
+<script>
+window.MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},svg:{fontCache:'global'}};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js" async></script>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#waves">Waves and phase</a></li>
+    <li><a href="#grating">The diffraction grating</a></li>
+    <li><a href="#wavefn">Full far-field wave function</a></li>
+    <li><a href="#delays">From grating to time delays</a></li>
+    <li><a href="#squint">Time delay vs phase shift</a></li>
+    <li><a href="#sim">Sound-field simulator</a></li>
+    <li><a href="#lobes">Grating lobes, f_max and f_min</a></li>
+    <li><a href="#spacing">Choosing the spacing d</a></li>
+    <li><a href="#farfield">Far-field distance</a></li>
+    <li><a href="#band">Steered band and distance</a></li>
+    <li><a href="#sampling">Sampling and hardware</a></li>
+    <li><a href="#design">Final design and formula sheet</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">RP2040 true-time-delay beamformer</p>
+  <h1>Steering sound with time delays</h1>
+  <p class="lede">How six small speakers form one beam, why a linear ramp of delays points it, and how the spacing, sampling rate and listener distance decide what you actually hear. Every result is derived from first principles and backed by an interactive model.</p>
+  <ul class="spec" aria-label="Chosen design">
+    <li><b>N = 6</b> speakers</li>
+    <li>face <b>24 × 20 mm</b>, a = 20 mm</li>
+    <li>spacing <b>d = 50 mm</b></li>
+    <li>steering up to <b>±45°</b></li>
+    <li>f<sub>s</sub> <b>96 kHz</b></li>
+    <li>DAC <b>AD5628</b></li>
+    <li>c = 343 m/s</li>
+  </ul>
+</header>
+
+<!-- 1 -->
+<section id="waves">
+<h2><span class="n">01</span>Waves and phase</h2>
+<p class="sub">Everything in this project comes from adding waves with different phases.</p>
+<p>A small speaker radiates approximately as a point source. At distance \(r\) its sound pressure is a spherical wave:</p>
+<div class="eq">\[ p(r,t)=\frac{A}{r}\,e^{\,j(\omega t-kr)},\qquad \omega=2\pi f,\quad k=\frac{2\pi}{\lambda}=\frac{\omega}{c},\quad \lambda=\frac{c}{f} \]</div>
+<div class="tbl"><table>
+<tr><th>Symbol</th><th>Meaning</th><th>Value in air</th></tr>
+<tr><td>\(c\)</td><td>speed of sound</td><td>343 m/s at about 20 °C</td></tr>
+<tr><td>\(f\), \(\omega\)</td><td>frequency, angular frequency</td><td>20 Hz to 20 kHz</td></tr>
+<tr><td>\(\lambda\)</td><td>wavelength</td><td>17 m at 20 Hz down to 1.7 cm at 20 kHz</td></tr>
+<tr><td>\(k\)</td><td>wavenumber: phase gained per metre</td><td>rad/m</td></tr>
+</table></div>
+<p>The term \(kr\) is the phase the wave has built up after travelling \(r\). Waves that meet in phase add (constructive interference); waves that meet half a cycle apart cancel. The pressure from many sources is just the sum of the individual pressures (superposition).</p>
+</section>
+
+<!-- 2 -->
+<section id="grating">
+<h2><span class="n">02</span>The diffraction grating</h2>
+<p class="sub">An array of speakers is mathematically the same object as an optical grating.</p>
+<p>A diffraction grating is a plate with many identical, equally spaced slits (period \(d\)). A plane wave falling on it makes every slit act as a new source (the Huygens–Fresnel principle). All slits are driven by the same wave, so they differ only in position. On a distant screen you see their interference.</p>
+<figure>
+<svg class="fig" viewBox="0 0 680 410" role="img" aria-labelledby="f1t f1d"><title id="f1t">Diffraction grating geometry</title><desc id="f1d">A plane wave hits a grating from below; rays leave each slit at angle theta; neighbouring rays differ in path by d sin theta.</desc>
+<defs><marker id="mA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" class="mk-acc"/></marker><marker id="mM" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" class="mk-mut"/></marker></defs>
+<text x="340" y="60" text-anchor="middle">To a distant screen, the rays are effectively parallel</text>
+<line x1="160" y1="255" x2="255" y2="95.5" class="acc" marker-end="url(#mA)"/>
+<line x1="240" y1="255" x2="335" y2="95.5" class="acc" marker-end="url(#mA)"/>
+<line x1="320" y1="255" x2="415" y2="95.5" class="acc" marker-end="url(#mA)"/>
+<line x1="400" y1="255" x2="495" y2="95.5" class="acc" marker-end="url(#mA)"/>
+<line x1="480" y1="255" x2="575" y2="95.5" class="acc" marker-end="url(#mA)"/>
+<line x1="160" y1="255" x2="180.5" y2="220.6" class="amb" stroke-width="4"/>
+<line x1="240" y1="255" x2="180.5" y2="220.6" class="ln dash"/>
+<text x="62" y="232">Δ = d sin θ</text>
+<line x1="480" y1="255" x2="480" y2="150" class="ln dash"/>
+<path d="M480 205 A50 50 0 0 1 505 211.7" class="ln"/>
+<text x="490" y="193">θ</text>
+<rect class="el" x="100" y="255" width="55" height="10"/><rect class="el" x="165" y="255" width="70" height="10"/><rect class="el" x="245" y="255" width="70" height="10"/><rect class="el" x="325" y="255" width="70" height="10"/><rect class="el" x="405" y="255" width="70" height="10"/><rect class="el" x="485" y="255" width="95" height="10"/>
+<text x="40" y="264">Grating</text>
+<line x1="160" y1="278" x2="240" y2="278" class="ln"/><line x1="160" y1="273" x2="160" y2="283" class="ln"/><line x1="240" y1="273" x2="240" y2="283" class="ln"/>
+<text x="200" y="296" text-anchor="middle">d</text>
+<line x1="120" y1="315" x2="560" y2="315" class="blu"/><line x1="120" y1="340" x2="560" y2="340" class="blu"/><line x1="120" y1="365" x2="560" y2="365" class="blu"/>
+<line x1="605" y1="370" x2="605" y2="305" class="ln" marker-end="url(#mM)"/>
+<text x="605" y="390" text-anchor="middle">Plane wave</text>
+</svg>
+<figcaption>Figure 1. Neighbouring rays towards angle θ differ in length by Δ = d sin θ.</figcaption>
+</figure>
+
+<h3>The exact distance R(x) and the far-field approximation</h3>
+<p>Put the array on the x-axis with its centre at the origin. A source sits at \((x,0)\) and the listener at distance \(r\), angle \(\theta\) from broadside, i.e. at \((r\sin\theta,\ r\cos\theta)\). The exact source-to-listener distance is</p>
+<div class="eq">\[ R(x)=\sqrt{(r\sin\theta-x)^2+(r\cos\theta)^2}=\sqrt{r^2-2rx\sin\theta+x^2}. \]</div>
+<p>Write \(R=r\sqrt{1+\varepsilon}\) with \(\varepsilon=-2(x/r)\sin\theta+(x/r)^2\) and use \(\sqrt{1+\varepsilon}\approx 1+\varepsilon/2-\varepsilon^2/8\):</p>
+<div class="eq">\[ R(x)\approx \underbrace{r}_{\text{common}}\;-\;\underbrace{x\sin\theta}_{\text{parallel rays}}\;+\;\underbrace{\frac{x^2\cos^2\theta}{2r}}_{\text{curvature, dropped}} \]</div>
+<p>In the far field the curvature term is negligible. In the amplitude \(1/R\) every source can be replaced by \(1/r\). In the phase \(kR\) the linear term must be kept, because \(k\,x\sin\theta\) is a sizeable fraction of \(2\pi\). That term creates the interference pattern.</p>
+
+<h3>Summing the sources: the array factor</h3>
+<p>With sources at \(x_n=nd\), \(n=0\ldots N-1\):</p>
+<div class="eq">\[ p\approx\frac{A}{r}e^{j(\omega t-kr)}\sum_{n=0}^{N-1}e^{jn\psi},\qquad \psi=kd\sin\theta \]</div>
+<p>The sum is a geometric series:</p>
+<div class="eq">\[ \mathrm{AF}(\theta)=\frac{1-e^{jN\psi}}{1-e^{j\psi}},\qquad |\mathrm{AF}|=\left|\frac{\sin(N\psi/2)}{\sin(\psi/2)}\right|,\qquad I\propto|\mathrm{AF}|^2 \]</div>
+<div class="tbl"><table>
+<tr><th>Feature</th><th>Condition</th><th>Meaning</th></tr>
+<tr><td>Principal maxima</td><td>\(\psi=2\pi m\Rightarrow d\sin\theta=m\lambda\)</td><td>The grating equation: all \(N\) waves arrive in phase, \(|\mathrm{AF}|=N\)</td></tr>
+<tr><td>Nulls</td><td>\(N\psi/2=p\pi\), \(p\) not a multiple of \(N\)</td><td>The \(N\) phasors close into a polygon and cancel</td></tr>
+<tr><td>Peak width</td><td>\(\Delta(\sin\theta)=\lambda/(Nd)\)</td><td>Set by the total length \(Nd\)</td></tr>
+<tr><td>Side lobes</td><td>\(N-2\) between nulls</td><td>First one about −13 dB for equal drive</td></tr>
+</table></div>
+<p>If the plane wave arrives tilted at \(\theta_i\), each slit is driven a little later than its neighbour and the grating equation becomes \(d(\sin\theta-\sin\theta_i)=m\lambda\). The zero-order beam leaves at \(\theta=\theta_i\). A speaker array reproduces this tilt electronically with time delays.</p>
+</section>
+
+<!-- 3 -->
+<section id="wavefn">
+<h2><span class="n">03</span>Full far-field wave function</h2>
+<p class="sub">Single-speaker envelope × array factor, and how a phase step turns into a time delay.</p>
+<p>Each speaker is modelled as a flat strip of width \(a\). Integrating the far-field phase across its face gives the single-slit pattern:</p>
+<div class="eq">\[ \int_{-a/2}^{a/2}e^{jkx\sin\theta}\,dx=a\,\frac{\sin\!\left(\frac{\pi a}{\lambda}\sin\theta\right)}{\frac{\pi a}{\lambda}\sin\theta} \]</div>
+<p>Adding a phase step \(\Phi\) between neighbouring speakers makes the array-factor phase \(\psi=\frac{2\pi d}{\lambda}\sin\theta+\Phi\). The total wave function is the product (pattern multiplication):</p>
+<div class="eq">\[ \Psi=\Psi_0\,\frac{\sin\!\left(\frac{\pi a}{\lambda}\sin\theta\right)}{\frac{\pi a}{\lambda}\sin\theta}\;\frac{\sin\!\left(\frac{N}{2}\left(\frac{2\pi d}{\lambda}\sin\theta+\Phi\right)\right)}{\sin\!\left(\frac{\pi d}{\lambda}\sin\theta+\frac{\Phi}{2}\right)},\qquad I=|\Psi|^2 \]</div>
+<p>\(\Psi_0\) contains the spherical wave \(e^{j(\omega t-kr)}/r\) and a common phase factor that disappears when the magnitude is taken. The main beam is where the denominator goes to zero:</p>
+<div class="eq">\[ \frac{\pi d}{\lambda}\sin\theta+\frac{\Phi}{2}=0\;\Rightarrow\;\theta=\sin^{-1}\!\left(\frac{-\lambda\Phi}{2\pi d}\right)=\sin^{-1}\!\left(\frac{-c}{2\pi d}\frac{\Phi}{f}\right) \]</div>
+<p>A delay \(t_d\) multiplies a tone by \(e^{-j\omega t_d}\), so \(\Phi=-2\pi f\,t_d\) and</p>
+<div class="result"><p>\[ \theta=\sin^{-1}\!\left(\frac{c\,t_d}{d}\right)\qquad\Longleftrightarrow\qquad t_d=\frac{d\sin\theta}{c} \]</p><p>The frequency has cancelled. A fixed time step \(t_d\) supplies exactly the right phase \(\Phi=-2\pi f t_d\) at every frequency at once. A fixed phase \(\Phi\) does not.</p></div>
+<p>Three things the short derivation hides:</p>
+<ul>
+<li><b>Other zeros of the denominator.</b> It also vanishes at \(\psi/2=m\pi\), giving \(\sin\theta=c\,t_d/d+m\lambda/d\). Those are the grating lobes (section 7).</li>
+<li><b>The envelope does not steer.</b> \(\Phi\) appears only in the array factor. A steered beam is scaled by \(\mathrm{sinc}^2(\pi a\sin\theta_0/\lambda)\). For \(a=20\) mm this costs less than 1.5 dB below 11 kHz.</li>
+<li><b>Range of validity.</b> \(|c\,t_d/d|\le1\), so the largest useful step is \(d/c\) (steering to ±90°). A round cone gives \(2J_1(x)/x\) instead of the sinc: the same broad bump with slightly different nulls.</li>
+</ul>
+
+<div class="widget" id="w2">
+<p class="wtitle">Interactive · pattern multiplication</p>
+<div class="seg" role="group" aria-label="What is held fixed">
+<button data-m="td" aria-pressed="true">Hold time delay t_d fixed</button>
+<button data-m="ph" aria-pressed="false">Hold phase Φ fixed (set at 2 kHz)</button>
+</div>
+<div class="ctl">
+<div><label for="w2th"><span>Target angle θ₀</span><span id="w2thv"></span></label><input id="w2th" type="range" min="-60" max="60" step="1" value="30"></div>
+<div><label for="w2f"><span>Frequency f</span><span id="w2fv"></span></label><input id="w2f" type="range" min="0" max="1000" step="1" value="732"></div>
+<div><label for="w2d"><span>Spacing d</span><span id="w2dv"></span></label><input id="w2d" type="range" min="2" max="10" step="0.5" value="5"></div>
+<div><label for="w2a"><span>Speaker width a (≤ d)</span><span id="w2av"></span></label><input id="w2a" type="range" min="0.5" max="10" step="0.5" value="2"></div>
+<div><label for="w2n"><span>Speakers N</span><span id="w2nv"></span></label><input id="w2n" type="range" min="2" max="16" step="1" value="6"></div>
+</div>
+<canvas id="w2c" aria-label="Intensity versus angle"></canvas>
+<div class="legend"><span><i class="sw" style="border-color:var(--accent)"></i>Total intensity I</span><span><i class="sw" style="border-color:var(--teal);border-top-style:dashed"></i>Array factor</span><span><i class="sw" style="border-color:var(--faint);border-top-style:dashed"></i>Single-speaker envelope</span><span><i class="sw" style="border-color:var(--blue);border-top-style:dotted"></i>Target θ₀</span></div>
+<div class="stats" id="w2s"></div>
+</div>
+</section>
+
+<!-- 4 -->
+<section id="delays">
+<h2><span class="n">04</span>From grating to time delays</h2>
+<p class="sub">The time-domain derivation, the delay for each speaker, and how the firmware applies it.</p>
+<p>Speaker \(n\) plays \(s(t-\tau_n)\). Its sound reaches a distant listener in direction \(\theta\) at</p>
+<div class="eq">\[ t_n(\theta)=\tau_n+\frac{R_n}{c}=\tau_n+\frac{r}{c}-\frac{x_n\sin\theta}{c}. \]</div>
+<p>For the loudest possible sound at \(\theta_0\), every copy must arrive at the same instant, for any waveform:</p>
+<div class="eq">\[ \tau_n-\frac{x_n\sin\theta_0}{c}=\text{const}\quad\Rightarrow\quad \tau_n=\frac{x_n\sin\theta_0}{c}\;\;\xrightarrow{x_n=nd}\;\; \tau_n=n\,t_d,\quad t_d=\frac{d\sin\theta_0}{c} \]</div>
+<p>This is the grating equation with \(c\,t_d\) playing the role of \(d\sin\theta_i\): the delay ramp acts like light falling on the grating at an angle, created electronically.</p>
+<figure>
+<svg class="fig" viewBox="0 0 680 440" role="img" aria-labelledby="f2t f2d"><title id="f2t">Huygens construction of a steered wavefront</title><desc id="f2d">Six speakers fire with delays from 0 to 5 t_d. At the instant the last one fires, the wavelets of the earlier ones have larger radii, and their common tangent is a wavefront tilted at theta zero.</desc>
+<defs><marker id="mA2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" class="mk-acc"/></marker></defs>
+<text x="40" y="40">Circles: sound emitted so far, at the instant the last speaker fires</text>
+<text x="40" y="60">Their common tangent is the tilted wavefront</text>
+<path d="M45 300 A175 175 0 0 1 395 300" class="blu"/><path d="M150 300 A140 140 0 0 1 430 300" class="blu"/><path d="M255 300 A105 105 0 0 1 465 300" class="blu"/><path d="M360 300 A70 70 0 0 1 500 300" class="blu"/><path d="M465 300 A35 35 0 0 1 535 300" class="blu"/>
+<line x1="570" y1="300" x2="223.6" y2="100" class="acc" stroke-width="2"/>
+<text x="215" y="92" text-anchor="end">Steered wavefront</text>
+<line x1="397" y1="200" x2="442" y2="122" class="acc" stroke-width="1.5" marker-end="url(#mA2)"/>
+<text x="452" y="118">Beam direction</text>
+<line x1="570" y1="300" x2="570" y2="190" class="ln dash"/><line x1="570" y1="300" x2="625" y2="204.7" class="ln dash"/>
+<path d="M570 255 A45 45 0 0 1 592.5 261" class="ln"/><text x="582" y="238">θ₀</text>
+<rect class="el" x="208" y="302" width="24" height="16" rx="2"/><rect class="el" x="278" y="302" width="24" height="16" rx="2"/><rect class="el" x="348" y="302" width="24" height="16" rx="2"/><rect class="el" x="418" y="302" width="24" height="16" rx="2"/><rect class="el" x="488" y="302" width="24" height="16" rx="2"/><rect class="el" x="558" y="302" width="24" height="16" rx="2"/>
+<text x="40" y="315">Speakers</text>
+<line x1="220" y1="328" x2="290" y2="328" class="ln"/><line x1="220" y1="324" x2="220" y2="332" class="ln"/><line x1="290" y1="324" x2="290" y2="332" class="ln"/>
+<text x="255" y="344" text-anchor="middle">d</text>
+<text x="40" y="392">Delay τₙ</text>
+<line x1="210" y1="400" x2="230" y2="400" class="acc" stroke-width="2"/>
+<rect class="bar" x="280" y="390" width="20" height="10"/><rect class="bar" x="350" y="380" width="20" height="20"/><rect class="bar" x="420" y="370" width="20" height="30"/><rect class="bar" x="490" y="360" width="20" height="40"/><rect class="bar" x="560" y="350" width="20" height="50"/>
+<text x="220" y="420" text-anchor="middle">0</text><text x="290" y="420" text-anchor="middle">t_d</text><text x="360" y="420" text-anchor="middle">2t_d</text><text x="430" y="420" text-anchor="middle">3t_d</text><text x="500" y="420" text-anchor="middle">4t_d</text><text x="570" y="420" text-anchor="middle">5t_d</text>
+</svg>
+<figcaption>Figure 2. The speaker farthest from the target fires first, because its sound has the longest way to go.</figcaption>
+</figure>
+
+<h3>The delay for each speaker</h3>
+<p>The delays are not all equal. The step between neighbours, \(t_d\), is the same everywhere; each speaker's delay grows linearly across the array. A delay common to all speakers only shifts the output in time and does not steer. Number the speakers \(n=0\ldots5\) from left to right, take \(\theta\) positive to the right (seen from behind the array), and shift so the smallest delay is zero, since a delay line cannot advance a signal:</p>
+<div class="eq">\[ \tau_n=n\,t_d-\min_n(n\,t_d),\qquad t_d=\frac{d\sin\theta_0}{c}\ \ (\text{signed}) \]</div>
+<div class="tbl"><table>
+<tr><th>Steering</th><th>S1 (left)</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th><th>S6 (right)</th></tr>
+<tr><td>Right, +θ₀</td><td>0</td><td>t_d</td><td>2t_d</td><td>3t_d</td><td>4t_d</td><td>5t_d</td></tr>
+<tr><td>Broadside, 0°</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>Left, −θ₀</td><td>5|t_d|</td><td>4|t_d|</td><td>3|t_d|</td><td>2|t_d|</td><td>|t_d|</td><td>0</td></tr>
+</table></div>
+<p>For the chosen array (d = 50 mm, f<sub>s</sub> = 96 kHz):</p>
+<div class="tbl"><table>
+<tr><th>θ₀</th><th class="num">t_d</th><th class="num">t_d in samples</th><th>Samples per speaker, S1…S6</th><th>Angle actually reached (step rounded)</th></tr>
+<tr><td>+30°</td><td class="num">72.9 µs</td><td class="num">6.997</td><td>0, 7, 14, 21, 28, 35</td><td>30.0°</td></tr>
+<tr><td>+45°</td><td class="num">103.1 µs</td><td class="num">9.895</td><td>0, 10, 20, 30, 40, 50</td><td>45.6°</td></tr>
+<tr><td>−45°</td><td class="num">−103.1 µs</td><td class="num">−9.895</td><td>50, 40, 30, 20, 10, 0</td><td>−45.6°</td></tr>
+</table></div>
+<p>The firmware keeps one circular buffer and gives each channel its own read offset. The largest delay (±90°) is \(5d/c=729\ \mu s=70\) samples, so a 128-sample buffer covers every angle.</p>
+<pre><code>#define BUF_LEN 128                 // power of two, larger than the 70-sample maximum
+int16_t buf[BUF_LEN];
+uint32_t w = 0;                     // write index
+uint8_t D[6];                       // per-speaker delay in samples, e.g. {0,7,14,21,28,35}
+
+// every sample period (96 kHz)
+buf[w &amp; (BUF_LEN - 1)] = input_sample;
+for (int n = 0; n &lt; 6; n++)
+    dac_out[n] = buf[(w - D[n]) &amp; (BUF_LEN - 1)];
+w++;
+// write the six values to the AD5628, then pulse LDAC so they update together</code></pre>
+</section>
+
+<!-- 5 -->
+<section id="squint">
+<h2><span class="n">05</span>Time delay vs phase shift</h2>
+<p class="sub">Why a phase-only steerer's beam moves with frequency.</p>
+<p>A phase-only steerer applies the step \(\alpha=k_0d\sin\theta_0\), computed at a design frequency \(f_0\), at every frequency. In the frequency domain the true-time-delay array factor is</p>
+<div class="eq">\[ \mathrm{AF}=\sum_n e^{jn(kd\sin\theta-\omega t_d)},\qquad kd\sin\theta-\omega t_d=\frac{\omega}{c}\left(d\sin\theta-c\,t_d\right) \]</div>
+<p>which peaks at \(\sin\theta=c\,t_d/d\) for every \(\omega\). The phase-only version peaks where \(kd\sin\theta=k_0d\sin\theta_0\):</p>
+<div class="eq">\[ \sin\theta_{\text{actual}}=\frac{f_0}{f}\sin\theta_0 \]</div>
+<p>The beam direction depends on frequency. This effect is called beam squint, and it is the same dispersion that makes an optical grating split white light into colours. Example with \(f_0=2\) kHz, \(\theta_0=30°\):</p>
+<div class="tbl"><table>
+<tr><th>f</th><th class="num">1 kHz</th><th class="num">1.5 kHz</th><th class="num">2 kHz</th><th class="num">3 kHz</th><th class="num">4 kHz</th><th class="num">8 kHz</th></tr>
+<tr><td>Beam angle</td><td class="num">90°</td><td class="num">41.8°</td><td class="num">30°</td><td class="num">19.5°</td><td class="num">14.5°</td><td class="num">7.2°</td></tr>
+</table></div>
+</section>
+
+<!-- 6 -->
+<section id="sim">
+<h2><span class="n">06</span>Sound-field simulator</h2>
+<p class="sub">Point sources with the delays applied, and the far-field beam pattern |AF(θ)|.</p>
+<p>The left panel animates the pressure field. The right panel plots the array factor from section 5 in dB, with the ideal time-delay pattern shown dashed for comparison. Sweep the frequency in each mode to see squint (phase-only), quantization side lobes (44.1 kHz) and grating lobes (large d or high f).</p>
+<div class="widget" id="w1">
+<p class="wtitle">Interactive · steered array</p>
+<div class="seg" role="group" aria-label="Steering method">
+<button data-m="ttd" aria-pressed="true">Ideal time delay</button>
+<button data-m="q96" aria-pressed="false">Quantized, 96 kHz</button>
+<button data-m="q44" aria-pressed="false">Quantized, 44.1 kHz</button>
+<button data-m="ph" aria-pressed="false">Phase-only, tuned at 2 kHz</button>
+<button id="w1pp" class="btn" style="margin-left:auto">Pause</button>
+</div>
+<p class="wcap" id="w1cap" style="margin:0 0 12px"></p>
+<div class="ctl">
+<div><label for="w1th"><span>Steering angle θ₀</span><span id="w1thv"></span></label><input id="w1th" type="range" min="-60" max="60" step="1" value="30"></div>
+<div><label for="w1f"><span>Frequency f</span><span id="w1fv"></span></label><input id="w1f" type="range" min="0" max="1000" step="1" value="624"></div>
+<div><label for="w1d"><span>Spacing d</span><span id="w1dv"></span></label><input id="w1d" type="range" min="2" max="10" step="0.5" value="5"></div>
+<div><label for="w1n"><span>Speakers N</span><span id="w1nv"></span></label><input id="w1n" type="range" min="2" max="16" step="1" value="6"></div>
+</div>
+<div class="panes" id="w1panes">
+<div class="pane"><canvas id="w1fc" aria-label="Animated pressure field"></canvas><p class="wcap">Pressure snapshot, 1.4 m wide. Coral: compression. Blue: rarefaction. Dashed: target.</p></div>
+<div class="pane"><canvas id="w1pc" aria-label="Polar beam pattern"></canvas><p class="wcap">|AF(θ)| in dB. Solid: current mode. Dashed grey: ideal delay. Dashed blue: target.</p></div>
+</div>
+<div class="stats" id="w1s"></div>
+<p class="wcap" style="margin-top:12px">Per-speaker setting, relative to the earliest speaker</p>
+<div class="pills" id="w1p"></div>
+</div>
+</section>
+
+<!-- 7 -->
+<section id="lobes">
+<h2><span class="n">07</span>Grating lobes, f_max and f_min</h2>
+<p class="sub">Where the extra beams appear, and the frequency band in which the array steers cleanly.</p>
+<h3>Grating-lobe angles</h3>
+<p>All speakers add fully whenever the path difference minus the applied delay is a whole number of wavelengths. For a steady tone, one cycle late looks exactly like on time:</p>
+<div class="eq">\[ d\sin\theta-d\sin\theta_0=m\lambda\quad\Rightarrow\quad \theta_m=\sin^{-1}\!\left(\sin\theta_0+m\frac{\lambda}{d}\right),\quad |\sin\theta_0+m\lambda/d|\le1 \]</div>
+<p>\(m=0\) is the main beam; each other real solution is a grating lobe. The array factor is at full strength at every such peak, so only the single-speaker envelope sets its level relative to the main beam:</p>
+<div class="eq">\[ L_m=10\log_{10}\frac{\mathrm{sinc}^2(a\sin\theta_m/\lambda)}{\mathrm{sinc}^2(a\sin\theta_0/\lambda)},\qquad \mathrm{sinc}(u)=\frac{\sin\pi u}{\pi u} \]</div>
+<div class="tbl"><table>
+<tr><th>f (d = 50 mm, θ₀ = +30°)</th><th class="num">λ/d</th><th>m = −1</th><th>m = −2</th><th>Grating lobes</th></tr>
+<tr><td>4 kHz</td><td class="num">1.715</td><td>−1.215, none</td><td>none</td><td>none</td></tr>
+<tr><td>5 kHz</td><td class="num">1.372</td><td>−0.872 → −60.7°</td><td>none</td><td>one</td></tr>
+<tr><td>8 kHz</td><td class="num">0.858</td><td>−0.358 → −20.9°</td><td>none</td><td>one, +0.4 dB above the main beam</td></tr>
+<tr><td>11 kHz</td><td class="num">0.624</td><td>−0.124 → −7.1°</td><td>−0.747 → −48.3°</td><td>two</td></tr>
+</table></div>
+<p>A steer to the right brings grating lobes in from the left edge (m = −1 first), and they sweep towards the main beam as frequency rises. With time delays the main beam stays fixed at every frequency, but every grating lobe still moves with frequency.</p>
+
+<h3>f_max: keep every grating lobe outside the visible window</h3>
+<p>Only \(|\sin\theta|\le1\) corresponds to real directions. For a steer to \(+\theta_0\) the nearest lobe is \(m=-1\) at \(\sin\theta_0-\lambda/d\). It stays invisible if</p>
+<div class="eq">\[ \sin\theta_0-\frac{\lambda}{d}\lt-1\iff d\lt\frac{\lambda}{1+|\sin\theta_0|}\iff f\lt f_{\max}=\frac{c}{d\,(1+|\sin\theta_{\max}|)} \]</div>
+<p>A lobe has width, and its skirt enters before its peak. The half-power point of \(\sin(Nx)/(N\sin x)\) is at \(Nx\approx1.392\), i.e. \(\Delta(\sin\theta)_{1/2}=0.443\lambda/(Nd)\). Keeping that edge outside as well:</p>
+<div class="result"><p>\[ f_{\max}=\frac{c\,(1-0.443/N)}{d\,(1+|\sin\theta_{\max}|)} \]</p></div>
+
+<h3>f_min: the array must be about one wavelength long</h3>
+<p>A beam exists only if the pattern falls to a null somewhere. The first broadside null is at \(N\psi/2=\pi\), i.e. \(\sin\theta_{\text{null}}=\lambda/(Nd)\). It lies inside the window when</p>
+<div class="result"><p>\[ \frac{\lambda}{Nd}\le1\iff f\ge f_{\min}=\frac{c}{Nd} \]</p></div>
+<p>At \(f_{\min}\) the beam is still broad (about 53°). When steered, the null on the endfire side sits at \(\sin\theta_0+\lambda/(Nd)\) and appears only above \(c/(Nd(1-\sin\theta_0))\), which is twice \(f_{\min}\) at 30° and 3.4 times at 45°.</p>
+
+<h3>The band ratio is set by N alone</h3>
+<div class="eq">\[ \frac{f_{\max}}{f_{\min}}=\frac{N-0.443}{1+\sin\theta_{\max}}\qquad(\text{simple form: }N/(1+\sin\theta_{\max})) \]</div>
+<p>The spacing only moves the band up or down; the number of speakers sets how wide it is. The narrowest clean beam, at the top of the band, is about \(0.886(1+\sin\theta_{\max})/N\) rad and also depends only on N.</p>
+
+<div class="widget" id="w3">
+<p class="wtitle">Interactive · the visible window</p>
+<div class="ctl">
+<div><label for="w3f"><span>Frequency f</span><span id="w3fv"></span></label><input id="w3f" type="range" min="0" max="1000" step="1" value="560"></div>
+<div><label for="w3th"><span>Steering θ₀</span><span id="w3thv"></span></label><input id="w3th" type="range" min="-60" max="60" step="1" value="30"></div>
+<div><label for="w3d"><span>Spacing d</span><span id="w3dv"></span></label><input id="w3d" type="range" min="20" max="120" step="1" value="50"></div>
+<div><label for="w3n"><span>Speakers N</span><span id="w3nv"></span></label><input id="w3n" type="range" min="2" max="16" step="1" value="6"></div>
+</div>
+<canvas id="w3c" aria-label="Array factor in sine-theta space"></canvas>
+<div class="legend"><span><i class="box" style="background:var(--blue-soft)"></i>Visible window |sin θ| ≤ 1</span><span><i class="sw" style="border-color:var(--accent)"></i>|AF|²/N²</span><span><i class="sw" style="border-color:var(--faint);border-top-style:dashed"></i>Peaks at sin θ₀ + mλ/d</span></div>
+<div class="stats" id="w3s"></div>
+</div>
+</section>
+
+<!-- 8 -->
+<section id="spacing">
+<h2><span class="n">08</span>Choosing the spacing d</h2>
+<p class="sub">Why the 20 mm speakers at 50 mm spacing were chosen for music with most of its energy between 200 Hz and 4 kHz.</p>
+<p>The smallest possible d is the speaker width (speakers touching). A smaller d always pushes grating lobes higher, but it also shortens the array and raises \(f_{\min}\). For music, the best choice is the largest d that still keeps grating lobes out up to 4 kHz, which moves the band as low as possible:</p>
+<div class="eq">\[ d^\ast=\frac{c\,(1-0.443/N)}{4000\,(1+\sin\theta_{\max})}\qquad N=6:\ \ 53\ \text{mm at }\pm30°,\ \ 46.5\ \text{mm at }\pm45° \]</div>
+<div class="tbl"><table>
+<tr><th class="num">d (mm)</th><th class="num">f_min</th><th class="num">Clean to, ±30° (simple)</th><th>Grating lobe at 4 kHz, 30°</th><th class="num">Beamwidth 1 / 2 / 4 kHz</th><th class="num">Far field at 4 kHz</th></tr>
+<tr><td class="num">20</td><td class="num">2.86 kHz</td><td class="num">11.4 kHz</td><td>none</td><td class="num">– / 79° / 37°</td><td class="num">0.23 m</td></tr>
+<tr><td class="num">30</td><td class="num">1.91 kHz</td><td class="num">7.6 kHz</td><td>none</td><td class="num">116° / 50° / 25°</td><td class="num">0.52 m</td></tr>
+<tr><td class="num">40</td><td class="num">1.43 kHz</td><td class="num">5.7 kHz</td><td>none</td><td class="num">79° / 37° / 18°</td><td class="num">0.93 m</td></tr>
+<tr class="hl"><td class="num">50</td><td class="num">1.14 kHz</td><td class="num">4.6 kHz</td><td>none</td><td class="num">62° / 30° / 15°</td><td class="num">1.46 m</td></tr>
+<tr><td class="num">55</td><td class="num">1.04 kHz</td><td class="num">4.2 kHz</td><td>−1.3 dB (skirt visible)</td><td class="num">55° / 27° / 13°</td><td class="num">1.76 m</td></tr>
+<tr><td class="num">70</td><td class="num">817 Hz</td><td class="num">3.3 kHz</td><td>−0.2 dB</td><td class="num">43° / 21° / 10°</td><td class="num">2.86 m</td></tr>
+<tr><td class="num">100</td><td class="num">572 Hz</td><td class="num">2.3 kHz</td><td>+0.1 dB</td><td class="num">30° / 15° / 7°</td><td class="num">5.83 m</td></tr>
+</table></div>
+<p>Two other options were considered. The 66 mm speakers touching (d = 66 mm) steer about 0.87–3.2 kHz at ±30°: lower, but the top of that band is short of 4 kHz. A single array covering 200 Hz–5 kHz at ±30° would need \(N\ge25(1+\sin\theta_{\max})+0.443=38\) speakers no wider than 45 mm, 1.7 m of array, so it is not practical here. That range needs a three-way array with a crossover.</p>
+
+<div class="widget" id="w4">
+<p class="wtitle">Interactive · spacing sweep for 20 mm speakers</p>
+<div class="seg" role="group" aria-label="Number of speakers" id="w4n"><button data-n="6" aria-pressed="true">N = 6</button><button data-n="8" aria-pressed="false">N = 8</button></div>
+<div class="seg" role="group" aria-label="Maximum steering" id="w4t"><button data-t="30" aria-pressed="false">±30°</button><button data-t="45" aria-pressed="true">±45°</button></div>
+<canvas id="w4c" aria-label="Clean steered band versus spacing"></canvas>
+<div class="legend"><span><i class="box" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>Steered, no grating lobes</span><span><i class="box" style="background:var(--blue-soft)"></i>Music band 200 Hz–4 kHz</span><span><i class="sw" style="border-color:var(--teal);border-top-style:dashed"></i>Largest d clean to 4 kHz</span><span><i class="sw" style="border-color:var(--ink)"></i>Chosen d = 50 mm</span></div>
+<p class="wcap" id="w4r" style="font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:8px">Hover or tap the chart to read values.</p>
+</div>
+</section>
+
+<!-- 9 -->
+<section id="farfield">
+<h2><span class="n">09</span>Far-field distance</h2>
+<p class="sub">Where 2L²/λ comes from, and what it means for a listener.</p>
+<figure>
+<svg class="fig" viewBox="0 0 680 390" role="img" aria-labelledby="f3t f3d"><title id="f3t">Origin of the far-field distance</title><desc id="f3d">The true path from the end speaker, L/2 off-centre, is longer than r by delta, about (L/2) squared over 2r.</desc>
+<path d="M150 251.8 A270 270 0 0 0 530 251.8" class="blu dash"/>
+<text x="40" y="236">Points at distance r</text>
+<line x1="340" y1="66" x2="340" y2="324" class="ln dash"/>
+<text x="330" y="200" text-anchor="end">r</text>
+<line x1="344" y1="65" x2="500.7" y2="277" class="ln"/>
+<line x1="500.7" y1="277" x2="537" y2="325" class="acc" stroke-width="4"/>
+<text x="548" y="296">δ ≈ (L/2)² / 2r</text>
+<circle cx="340" cy="60" r="5" class="dot"/><text x="354" y="55">Listener</text>
+<rect class="el" x="132" y="325" width="16" height="10" rx="2"/><rect class="el" x="212" y="325" width="16" height="10" rx="2"/><rect class="el" x="292" y="325" width="16" height="10" rx="2"/><rect class="el" x="372" y="325" width="16" height="10" rx="2"/><rect class="el" x="452" y="325" width="16" height="10" rx="2"/><rect class="el" x="532" y="325" width="16" height="10" rx="2"/>
+<line x1="340" y1="350" x2="540" y2="350" class="ln"/><line x1="340" y1="345" x2="340" y2="355" class="ln"/><line x1="540" y1="345" x2="540" y2="355" class="ln"/><text x="440" y="370" text-anchor="middle">L/2</text>
+<line x1="140" y1="350" x2="336" y2="350" class="ln"/><line x1="140" y1="345" x2="140" y2="355" class="ln"/><text x="238" y="370" text-anchor="middle">L/2</text>
+</svg>
+<figcaption>Figure 3. The curvature error δ, drawn much larger than it really is.</figcaption>
+</figure>
+<p>The far-field formula drops the term \(x^2\cos^2\theta/(2r)\) from \(R(x)\). It is largest for the end speakers (\(x=\pm L/2\)) at broadside:</p>
+<div class="eq">\[ \delta_{\max}=\frac{L^2}{8r},\qquad \Delta\phi=k\,\delta_{\max}=\frac{\pi L^2}{4\lambda r}\le\frac{\pi}{8}\quad\Longrightarrow\quad r_{\text{ff}}\ge\frac{2L^2}{\lambda} \]</div>
+<p>\(L=(N-1)d\) is the distance between the end speakers' centres (0.25 m here); adding one speaker width gives 0.27 m and a slightly larger, more cautious distance. The π/8 limit is the antenna-measurement convention. A looser π/4 gives \(L^2/\lambda\), which is enough for the main beam only.</p>
+<div class="tbl"><table>
+<tr><th>f</th><th class="num">λ</th><th class="num">2L²/λ, L = 0.25 m</th><th class="num">L = 0.27 m</th><th class="num">Along a 45° beam (× cos²θ)</th></tr>
+<tr><td>1 kHz</td><td class="num">34.3 cm</td><td class="num">0.36 m</td><td class="num">0.43 m</td><td class="num">0.18 m</td></tr>
+<tr><td>2 kHz</td><td class="num">17.2 cm</td><td class="num">0.73 m</td><td class="num">0.85 m</td><td class="num">0.36 m</td></tr>
+<tr class="hl"><td>4 kHz</td><td class="num">8.6 cm</td><td class="num">1.46 m</td><td class="num">1.70 m</td><td class="num">0.73 m</td></tr>
+</table></div>
+<div class="note">The highest frequency in use sets the requirement. A figure of 0.6 m comes from using L = N·d = 0.30 m at f_min = 1.14 kHz; the lowest frequency gives the smallest far-field distance, so it cannot be used for the whole band.</div>
+<h3>Distance zones</h3>
+<div class="tbl"><table>
+<tr><th>Listener distance (4 kHz, steered to 30°, exact spherical waves)</th><th class="num">Beam peak</th><th class="num">Beamwidth</th><th class="num">Worst level > 60° away</th></tr>
+<tr><td>0.15 m, shorter than the array</td><td class="num">−90°</td><td class="num">no beam</td><td class="num">−2.0 dB</td></tr>
+<tr><td>0.25 m (= L)</td><td class="num">35.1°</td><td class="num">21.8°</td><td class="num">−5.4 dB</td></tr>
+<tr><td>0.5 m (= 2L)</td><td class="num">31.3°</td><td class="num">18.0°</td><td class="num">−9.1 dB</td></tr>
+<tr><td>1.0 m</td><td class="num">30.3°</td><td class="num">17.3°</td><td class="num">−10.0 dB</td></tr>
+<tr class="hl"><td>1.5 m (about the far-field distance)</td><td class="num">30.2°</td><td class="num">17.2°</td><td class="num">−10.2 dB</td></tr>
+<tr><td>Far-field formula</td><td class="num">30.0°</td><td class="num">17.2°</td><td class="num">−10.3 dB</td></tr>
+</table></div>
+<p>Beyond about 2L (0.5 m) a listener already hears the beam pointing the right way. From 2L²/λ onwards the shape, including nulls and side lobes, is final. Farther away the level drops by 6 dB per doubling of distance and room reflections take over, so the best place to listen is at or a little beyond the far-field distance (about 1.5–2.5 m). Measurements of nulls and side lobes need at least 1.5 m.</p>
+</section>
+
+<!-- 10 -->
+<section id="band">
+<h2><span class="n">10</span>Steered band and distance, simulated</h2>
+<p class="sub">The chosen array: N = 6, a = 20 mm, d = 50 mm.</p>
+<div class="tbl"><table>
+<tr><th>Quantity</th><th>Formula</th><th class="num">±30°</th><th class="num">±45°</th></tr>
+<tr><td>Beam forms above</td><td>\(c/(Nd)\)</td><td class="num">1.14 kHz</td><td class="num">1.14 kHz</td></tr>
+<tr><td>Both main-lobe nulls visible above</td><td>\(c/(Nd(1-\sin\theta_0))\)</td><td class="num">2.29 kHz</td><td class="num">3.90 kHz</td></tr>
+<tr><td>Grating-lobe peak enters</td><td>\(c/(d(1+\sin\theta_0))\)</td><td class="num">4.57 kHz</td><td class="num">4.02 kHz</td></tr>
+<tr><td>Grating-lobe skirt enters</td><td>× \((1-0.443/N)\)</td><td class="num">4.24 kHz</td><td class="num">3.72 kHz</td></tr>
+</table></div>
+<p>At ±45° the beam points correctly from 1.14 kHz but, until about 3.9 kHz, has no null on its endfire side and spills towards +90°; the grating lobe arrives at about 3.7 kHz. For a clearly visible demonstration, steer within ±30–35° and keep 45° as an extreme test point.</p>
+<div class="widget" id="w5">
+<p class="wtitle">Interactive · steered band and listener distance</p>
+<div class="ctl">
+<div><label for="w5th"><span>Steering θ₀</span><span id="w5thv"></span></label><input id="w5th" type="range" min="-45" max="45" step="1" value="45"></div>
+<div><label for="w5f"><span>Frequency for plot B</span><span id="w5fv"></span></label><input id="w5f" type="range" min="0" max="1000" step="1" value="660"></div>
+<div><label for="w5r"><span>Listener distance</span><span id="w5rv"></span></label><input id="w5r" type="range" min="0" max="1000" step="1" value="585"></div>
+</div>
+<p class="wcap" style="font-weight:500;color:var(--ink);font-size:13px">A · Beam vs frequency, far field</p>
+<canvas id="w5a" aria-label="Beam pattern versus frequency"></canvas>
+<p class="wcap">Each row is scaled to its own peak. Dashed vertical: target. Blue line: plot B's frequency.</p>
+<p class="wcap" style="font-weight:500;color:var(--ink);font-size:13px;margin-top:14px">B · Beam vs listener distance, exact spherical waves</p>
+<canvas id="w5b" aria-label="Beam pattern versus distance"></canvas>
+<p class="wcap">Each row is the pattern on an arc at that distance. Blue line: listener. Dotted: L, 2L and 2L²/λ.</p>
+<div class="stats" id="w5s"></div>
+</div>
+</section>
+
+<!-- 11 -->
+<section id="sampling">
+<h2><span class="n">11</span>Sampling and hardware</h2>
+<p class="sub">Why 96 kHz, and what the AD5628 and RP2040 allow.</p>
+<p>Delays can only be whole sample periods \(T_s=1/f_s\), a distance step of \(cT_s\). Rounding the step \(t_d\) limits the angles to \(\sin\theta=m\,cT_s/d\). Rounding each speaker's delay separately keeps the average angle, but leaves timing errors of up to ±\(T_s/2\), a phase error of ±\(\pi f/f_s\) that grows with frequency and raises the side lobes.</p>
+<div class="tbl"><table>
+<tr><th>Check (AD5628: 50 MHz SPI, 32-bit frames, 2.5 µs typ / 7 µs max settling, LDAC)</th><th class="num">44.1 kHz</th><th class="num">96 kHz</th><th class="num">192 kHz</th></tr>
+<tr><td>Sample period</td><td class="num">22.7 µs</td><td class="num">10.4 µs</td><td class="num">5.2 µs</td></tr>
+<tr><td>DAC settles within one period (7 µs max)</td><td class="num">yes</td><td class="num">yes</td><td class="num">no</td></tr>
+<tr><td>8 × 32-bit writes via PIO at 44.3 MHz (≈ 5.8 µs)</td><td class="num">yes</td><td class="num">yes, 55 %</td><td class="num">no</td></tr>
+<tr><td>Delay step c·T<sub>s</sub></td><td class="num">7.78 mm</td><td class="num">3.57 mm</td><td class="num">1.79 mm</td></tr>
+<tr><td>Angle step near broadside, d = 50 mm</td><td class="num">8.9°</td><td class="num">4.1°</td><td class="num">2.0°</td></tr>
+<tr><td>Per-speaker rounding error at 4 kHz</td><td class="num">±16.3°</td><td class="num">±7.5°</td><td class="num">±3.8°</td></tr>
+<tr><td>CPU cycles per sample at 133 MHz</td><td class="num">3016</td><td class="num">1385</td><td class="num">693</td></tr>
+</table></div>
+<p>Angles reachable at 96 kHz with d = 50 mm and a whole-sample step (m = 0…13): 0°, 4.1°, 8.2°, 12.4°, 16.6°, 20.9°, 25.4°, 30.0°, 34.9°, 40.0°, 45.6°, 51.8°, 59.0°, 68.3°.</p>
+<div class="note">Update all channels together with LDAC (or the software LDAC command). Without it, each channel updates one frame (about 0.72 µs) after the previous one, which adds an unwanted delay ramp. The RP2040 hardware SPI sends at most 16 bits per frame, so a PIO state machine sending 32-bit frames is the simpler route. The -2 variant (2.5 V reference, 5 V full scale) needs VDD ≈ 5 V; check its logic-high input threshold against the RP2040's 3.3 V outputs. Keep 44.1 / 48 kHz selectable in firmware so quantization can be measured as a variable.</div>
+</section>
+
+<!-- 12 -->
+<section id="design">
+<h2><span class="n">12</span>Final design and formula sheet</h2>
+<div class="cards">
+<div class="card"><h4>Array</h4><div class="big">6 × 20 mm, d = 50 mm</div><p>20 mm side along the array; L = 0.25 m between end centres; 30 mm gaps filled with a solid baffle.</p></div>
+<div class="card"><h4>Steered band</h4><div class="big">1.14–4.2 kHz</div><p>At ±30°. At ±45°, clean to 3.7 kHz, with the beam fully formed only near the top.</p></div>
+<div class="card"><h4>Far field</h4><div class="big">≥ 1.5 m</div><p>Covers the whole band at every angle. The beam is audible from about 0.5 m.</p></div>
+<div class="card"><h4>Sampling</h4><div class="big">96 kHz</div><p>7 samples per step at 30°, 10 at 45°; 128-sample delay buffer; LDAC-synchronised updates.</p></div>
+</div>
+<p>Below about 1.1 kHz the array does not steer. A single ordinary speaker for that range, fed through a crossover, keeps the demo sounding full. For a clean band all the way to 4 kHz at ±45°, d would have to drop to 46.5 mm.</p>
+<div class="tbl"><table>
+<tr><th>Quantity</th><th>Formula</th></tr>
+<tr><td>Exact distance</td><td>\(R(x)=\sqrt{r^2-2rx\sin\theta+x^2}\approx r-x\sin\theta+\dfrac{x^2\cos^2\theta}{2r}\)</td></tr>
+<tr><td>Array factor</td><td>\(\left|\dfrac{\sin[N\pi d(\sin\theta-\sin\theta_0)/\lambda]}{N\sin[\pi d(\sin\theta-\sin\theta_0)/\lambda]}\right|\)</td></tr>
+<tr><td>Single-speaker envelope</td><td>\(\mathrm{sinc}(a\sin\theta/\lambda)\)</td></tr>
+<tr><td>Delay step</td><td>\(t_d=d\sin\theta_0/c\), speaker \(n\): \(\tau_n=n\,t_d\) (shifted so min = 0)</td></tr>
+<tr><td>Steering angle</td><td>\(\theta_0=\sin^{-1}(c\,t_d/d)\)</td></tr>
+<tr><td>Phase-only squint</td><td>\(\sin\theta=(f_0/f)\sin\theta_0\)</td></tr>
+<tr><td>Grating lobes</td><td>\(\sin\theta_m=\sin\theta_0+m\lambda/d\)</td></tr>
+<tr><td>Upper clean frequency</td><td>\(f_{\max}=c(1-0.443/N)/[d(1+|\sin\theta_{\max}|)]\)</td></tr>
+<tr><td>Beam forms above</td><td>\(f_{\min}=c/(Nd)\)</td></tr>
+<tr><td>Band ratio</td><td>\(f_{\max}/f_{\min}=(N-0.443)/(1+\sin\theta_{\max})\)</td></tr>
+<tr><td>Half-power beamwidth</td><td>\(\approx0.886\lambda/(Nd\cos\theta_0)\) rad</td></tr>
+<tr><td>Far-field distance</td><td>\(r_{\text{ff}}=2L^2/\lambda,\ L=(N-1)d\)</td></tr>
+<tr><td>Quantized angles</td><td>\(\sin\theta=m\,c/(f_s d)\); rounding error ±\(\pi f/f_s\) rad</td></tr>
+</table></div>
+<footer>All figures use c = 343 m/s. Simulations model the speakers as ideal point sources or flat strips in free space; real drivers, baffles and room reflections will change the measured patterns.</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+const C=343;
+const $=id=>document.getElementById(id);
+const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const redraws=[];
+const onTheme=fn=>redraws.push(fn);
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>redraws.forEach(f=>f()));}catch(e){}
+new MutationObserver(()=>redraws.forEach(f=>f())).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+function fit(cv,ratio,minH,maxH){const w=cv.parentElement.clientWidth||320;let h=w*ratio;if(minH)h=Math.max(minH,h);if(maxH)h=Math.min(maxH,h);const dpr=window.devicePixelRatio||1;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);cv.style.height=h+'px';const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return{w,h,ctx};}
+function watch(el,fn){let lw=-1;new ResizeObserver(()=>{const w=el.clientWidth;if(w!==lw){lw=w;fn();}}).observe(el);}
+const logMap=(lo,hi)=>v=>lo*Math.pow(hi/lo,v/1000);
+const fmtF=f=>f>=1000?(f/1000).toFixed(2)+' kHz':Math.round(f)+' Hz';
+const font=()=>'11px '+(tok('--sans')||'sans-serif');
+const minus=s=>String(s).replace('-','−');
+const statHTML=items=>items.map(([k,v])=>'<div class="stat"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>').join('');
+function segBind(container,attr,cb){const bs=container.querySelectorAll('button[data-'+attr+']');bs.forEach(b=>b.addEventListener('click',()=>{bs.forEach(o=>o.setAttribute('aria-pressed',o===b?'true':'false'));cb(b.dataset[attr]);}));}
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* W1: sound-field simulator */
+(function(){
+const fs0=44100,fs1=96000,f0=2000,W=200,H=140,XW=1.4,YH=0.98,Y0=0.06;
+const st={th:30,f:2000,d:5,N:6,mode:'ttd',run:!reduce,vis:true};
+let phi=0,Fc=new Float32Array(W*H),Fsn=new Float32Array(W*H),polar=null,FS=null,PS=null;
+const fc=$('w1fc'),pc=$('w1pc');const off=document.createElement('canvas');off.width=W;off.height=H;const ox=off.getContext('2d'),img=ox.createImageData(W,H);
+const caps={ttd:'Each speaker delayed by exactly τₙ = n·d·sinθ₀ / c.',q96:'Each τₙ rounded to whole 10.4 µs samples (96 kHz).',q44:'Each τₙ rounded to whole 22.7 µs samples (44.1 kHz).',ph:'Phase steps computed for 2 kHz and applied unchanged at every frequency.'};
+const fmap=logMap(200,8000);
+const xs=()=>{const a=[];for(let n=0;n<st.N;n++)a.push((n-(st.N-1)/2)*st.d/100);return a;};
+function delays(){const s=Math.sin(st.th*Math.PI/180),d=st.d/100;let t=[];for(let n=0;n<st.N;n++)t.push(n*d*s/C);const m=Math.min(...t);t=t.map(v=>v-m);const Ts=st.mode==='q44'?1/fs0:1/fs1;const tq=t.map(v=>Math.round(v/Ts)*Ts);const w=2*Math.PI*st.f;const ideal=t.map(v=>w*v);let ph;if(st.mode==='ttd')ph=ideal;else if(st.mode==='ph')ph=t.map(v=>(2*Math.PI*f0*v)%(2*Math.PI));else ph=tq.map(v=>w*v);return{t,tq,ph,ideal,Ts};}
+function af(ph,k,x,th){let re=0,im=0;const s=Math.sin(th);for(let n=0;n<x.length;n++){const a=k*x[n]*s-ph[n];re+=Math.cos(a);im+=Math.sin(a);}return Math.hypot(re,im)/x.length;}
+function scan(ph,k,x){const a=new Float32Array(1801);for(let i=0;i<=1800;i++)a[i]=af(ph,k,x,(-90+i*0.1)*Math.PI/180);return a;}
+function peaks(a){const p=[];for(let i=0;i<=1800;i++){const l=i>0?a[i-1]:-1,r=i<1800?a[i+1]:-1;if(a[i]>l&&a[i]>=r&&a[i]>0.7)p.push({a:-90+i*0.1,v:a[i]});}return p;}
+function build(){const x=xs(),D=delays(),k=2*Math.PI*st.f/C;
+ for(let j=0;j<H;j++){const y=(H-j-0.5)/H*YH-Y0;for(let i=0;i<W;i++){const X=(i+0.5)/W*XW-XW/2;let cs=0,sn=0;for(let n=0;n<x.length;n++){const dx=X-x[n],r=Math.sqrt(dx*dx+y*y),a=D.ph[n]+k*r,A=1/Math.sqrt(r+0.03);cs+=A*Math.cos(a);sn+=A*Math.sin(a);}Fc[j*W+i]=cs;Fsn[j*W+i]=sn;}}
+ const cur=scan(D.ph,k,x),id=st.mode==='ttd'?null:scan(D.ideal,k,x);polar={cur,id};stats(D,cur);drawPolar();drawField();}
+function stats(D,cur){const lam=C/st.f,dt=Math.abs(st.d/100*Math.sin(st.th*Math.PI/180)/C),pk=peaks(cur);let main;
+ if(pk.length)main=pk.reduce((b,p)=>Math.abs(p.a-st.th)<Math.abs(b.a-st.th)?p:b);else{let bi=0;for(let i=1;i<=1800;i++)if(cur[i]>cur[bi])bi=i;main={a:-90+bi*0.1};}
+ const gl=pk.filter(p=>p!==main&&Math.abs(p.a-main.a)>2).map(p=>minus(p.a.toFixed(0))+'°');const L=(st.N-1)*st.d/100,ff=2*L*L/lam,err=main.a-st.th;
+ $('w1s').innerHTML=statHTML([['Wavelength λ',(lam*100).toFixed(1)+' cm'],['Step t_d',(dt*1e6).toFixed(1)+' µs · '+(dt*fs1).toFixed(2)+' smp @96k'],['d / λ',(st.d/100/lam).toFixed(2)],['Beam points to',minus(main.a.toFixed(1))+'° ('+(err>=0?'+':'−')+Math.abs(err).toFixed(1)+'°)'],['Grating lobes',gl.length?gl.join(', '):'None'],['Far field beyond',ff<0.1?'< 0.1 m':ff.toFixed(2)+' m']]);
+ $('w1p').innerHTML=D.t.map((t,n)=>{let s;if(st.mode==='q44'||st.mode==='q96'){const m=Math.round(t/D.Ts);s=m+' smp ('+(m*D.Ts*1e6).toFixed(1)+' µs)';}else if(st.mode==='ph')s='phase '+(D.ph[n]*180/Math.PI).toFixed(0)+'°';else s=(t*1e6).toFixed(1)+' µs';return '<span class="pill">S'+(n+1)+': '+s+'</span>';}).join('');}
+function drawPolar(){if(!polar)return;PS=fit(pc,0.62);const {w,h,ctx:x}=PS;x.clearRect(0,0,w,h);
+ const cx=w/2,cy=h-18,R=Math.max(40,Math.min(w/2-34,h-40)),rule=tok('--rule'),mu=tok('--muted');x.lineWidth=1;x.strokeStyle=rule;x.fillStyle=mu;x.font=font();
+ [0,10,20].forEach(db=>{const r=R*(30-db)/30;x.beginPath();x.arc(cx,cy,r,Math.PI,2*Math.PI);x.stroke();x.textAlign='left';x.textBaseline='bottom';x.fillText(db?'−'+db+' dB':'0 dB',cx+4,cy-r-2);});
+ [-90,-60,-30,0,30,60,90].forEach(a=>{const t=a*Math.PI/180;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+R*Math.sin(t),cy-R*Math.cos(t));x.stroke();x.textAlign='center';x.textBaseline='middle';x.fillText(minus(a)+'°',cx+(R+16)*Math.sin(t),cy-(R+12)*Math.cos(t));});
+ const tt=st.th*Math.PI/180;x.setLineDash([4,4]);x.strokeStyle=tok('--blue');x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+R*Math.sin(tt),cy-R*Math.cos(tt));x.stroke();
+ const curve=(arr,col,dash,lw)=>{x.setLineDash(dash);x.strokeStyle=col;x.lineWidth=lw;x.beginPath();for(let i=0;i<=1800;i++){const th=(-90+i*0.1)*Math.PI/180,db=20*Math.log10(Math.max(arr[i],1e-4)),r=R*Math.max(0,(db+30)/30),X=cx+r*Math.sin(th),Y=cy-r*Math.cos(th);i?x.lineTo(X,Y):x.moveTo(X,Y);}x.stroke();};
+ if(polar.id)curve(polar.id,tok('--faint'),[5,4],1.2);curve(polar.cur,tok('--accent'),[],2);x.setLineDash([]);}
+function drawField(){if(!FS)return;const {w,h,ctx:x}=FS,D=img.data,cp=Math.cos(phi),sp=Math.sin(phi),g=1/(0.9*st.N);
+ for(let q=0;q<W*H;q++){let v=Math.tanh((cp*Fc[q]+sp*Fsn[q])*g);const o=q*4;if(v>=0){D[o]=216;D[o+1]=90;D[o+2]=48;}else{D[o]=55;D[o+1]=138;D[o+2]=221;v=-v;}D[o+3]=v*235;}
+ ox.putImageData(img,0,0);x.clearRect(0,0,w,h);x.imageSmoothingEnabled=true;x.drawImage(off,0,0,w,h);
+ const X=v=>(v/XW+0.5)*w,Y=v=>(1-(v+Y0)/YH)*h,t=st.th*Math.PI/180,mu=tok('--muted');
+ x.setLineDash([5,5]);x.strokeStyle=mu;x.lineWidth=1;x.beginPath();x.moveTo(X(0),Y(0));x.lineTo(X(0.9*Math.sin(t)),Y(0.9*Math.cos(t)));x.stroke();x.setLineDash([]);
+ x.fillStyle=tok('--ink');xs().forEach(p=>x.fillRect(X(p)-3,Y(0)-3,6,6));
+ x.strokeStyle=mu;x.beginPath();x.moveTo(X(-0.66),Y(0.88));x.lineTo(X(-0.46),Y(0.88));x.stroke();x.fillStyle=mu;x.font=font();x.textAlign='left';x.textBaseline='bottom';x.fillText('20 cm',X(-0.66),Y(0.88)-3);}
+function resize(){FS=fit(fc,0.7);drawPolar();drawField();}
+function sync(){st.th=+$('w1th').value;st.f=Math.round(fmap(+$('w1f').value)/10)*10;st.d=+$('w1d').value;st.N=+$('w1n').value;$('w1thv').textContent=minus(st.th)+'°';$('w1fv').textContent=fmtF(st.f);$('w1dv').textContent=st.d.toFixed(1)+' cm';$('w1nv').textContent=st.N;build();}
+['w1th','w1f','w1d','w1n'].forEach(id=>$(id).addEventListener('input',sync));
+segBind($('w1'),'m',m=>{st.mode=m;$('w1cap').textContent=caps[m];build();});
+const pp=$('w1pp');pp.textContent=st.run?'Pause':'Play';pp.addEventListener('click',()=>{st.run=!st.run;pp.textContent=st.run?'Pause':'Play';});
+new IntersectionObserver(e=>{st.vis=e[0].isIntersecting;}).observe($('w1'));
+$('w1cap').textContent=caps.ttd;watch($('w1panes'),resize);onTheme(()=>{drawPolar();drawField();});
+FS=fit(fc,0.7);sync();
+(function loop(){if(st.run&&st.vis){phi+=0.12;drawField();}requestAnimationFrame(loop);})();
+})();
+
+/* W2: pattern multiplication */
+(function(){
+const f0=2000,st={th:30,f:4000,d:5,a:2,N:6,mode:'td'},cv=$('w2c'),fmap=logMap(200,12000);let res=null;
+const dB=v=>10*Math.log10(Math.max(v,1e-6));
+function calc(){const lam=C/st.f,d=st.d/100,a=st.a/100,td=d*Math.sin(st.th*Math.PI/180)/C,Phi=st.mode==='td'?-2*Math.PI*st.f*td:-2*Math.PI*f0*td;
+ const E=new Float32Array(1801),A=new Float32Array(1801),P=new Float32Array(1801);
+ for(let i=0;i<=1800;i++){const s=Math.sin((-90+i*0.1)*Math.PI/180),u=Math.PI*a*s/lam,e=Math.abs(u)<1e-9?1:Math.sin(u)/u,hh=Math.PI*d*s/lam+Phi/2,den=Math.sin(hh),afv=Math.abs(den)<1e-9?st.N:Math.sin(st.N*hh)/den,a2=(afv/st.N)**2;E[i]=e*e;A[i]=a2;P[i]=e*e*a2;}
+ const pk=[];for(let i=0;i<=1800;i++){const l=i>0?A[i-1]:-1,r=i<1800?A[i+1]:-1;if(A[i]>l&&A[i]>=r&&A[i]>0.5)pk.push(i);}res={E,A,P,pk,td,Phi};}
+function stats(){const {P,pk,td,Phi}=res;const main=pk.length?pk.reduce((b,i)=>Math.abs(-90+i*0.1-st.th)<Math.abs(-90+b*0.1-st.th)?i:b):900;
+ const gl=pk.filter(i=>i!==main&&Math.abs(i-main)>20).map(i=>minus((-90+i*0.1).toFixed(0))+'° ('+minus(dB(P[i]).toFixed(1))+' dB)');const pd=((Phi*180/Math.PI)%360+540)%360-180;
+ $('w2s').innerHTML=statHTML([['Step delay t_d',(td*1e6).toFixed(1)+' µs'],['Phase step Φ at this f',minus(pd.toFixed(0))+'°'],['Main beam at',minus((-90+main*0.1).toFixed(1))+'°'],['Main beam level',minus(dB(P[main]).toFixed(1))+' dB'],['Grating lobes',gl.length?gl.join(', '):'None']]);}
+function draw(){if(!res)return;const {w,h,ctx:x}=fit(cv,0.45,240);x.clearRect(0,0,w,h);const L=46,R=12,T=12,B=30,X=t=>L+(t+90)/180*(w-L-R),Y=d=>T+Math.min(40,-d)/40*(h-T-B);
+ x.font=font();x.fillStyle=tok('--muted');x.strokeStyle=tok('--rule');x.lineWidth=1;
+ for(let d=0;d>=-40;d-=10){x.beginPath();x.moveTo(L,Y(d));x.lineTo(w-R,Y(d));x.stroke();x.textAlign='right';x.textBaseline='middle';x.fillText(d===0?'0 dB':'−'+(-d),L-6,Y(d));}
+ for(let t=-90;t<=90;t+=30){x.beginPath();x.moveTo(X(t),T);x.lineTo(X(t),h-B);x.stroke();x.textAlign='center';x.textBaseline='top';x.fillText(minus(t)+'°',X(t),h-B+6);}
+ x.setLineDash([2,3]);x.strokeStyle=tok('--blue');x.beginPath();x.moveTo(X(st.th),T);x.lineTo(X(st.th),h-B);x.stroke();
+ const cur=(arr,col,dash,lw)=>{x.setLineDash(dash);x.strokeStyle=col;x.lineWidth=lw;x.beginPath();for(let i=0;i<=1800;i++){const px=X(-90+i*0.1),py=Y(dB(arr[i]));i?x.lineTo(px,py):x.moveTo(px,py);}x.stroke();};
+ cur(res.E,tok('--faint'),[5,4],1.2);cur(res.A,tok('--teal'),[4,3],1.2);cur(res.P,tok('--accent'),[],2);x.setLineDash([]);}
+function sync(){st.th=+$('w2th').value;st.f=Math.round(fmap(+$('w2f').value)/10)*10;st.d=+$('w2d').value;$('w2a').max=st.d;if(+$('w2a').value>st.d)$('w2a').value=st.d;st.a=+$('w2a').value;st.N=+$('w2n').value;
+ $('w2thv').textContent=minus(st.th)+'°';$('w2fv').textContent=fmtF(st.f);$('w2dv').textContent=st.d.toFixed(1)+' cm';$('w2av').textContent=st.a.toFixed(1)+' cm';$('w2nv').textContent=st.N;calc();stats();draw();}
+['w2th','w2f','w2d','w2a','w2n'].forEach(id=>$(id).addEventListener('input',sync));
+segBind($('w2'),'m',m=>{st.mode=m;sync();});watch(cv.parentElement,draw);onTheme(draw);sync();
+})();
+
+/* W3: visible window */
+(function(){
+const st={},cv=$('w3c'),fmap=logMap(300,12000);
+function draw(){const {w,h,ctx:x}=fit(cv,0.4,220);x.clearRect(0,0,w,h);const U0=-3,U1=3,L=36,R=12,T=12,B=30,X=u=>L+(u-U0)/(U1-U0)*(w-L-R),Y=v=>T+(1-v)*(h-T-B);
+ const lam=C/st.f,d=st.d/1000,u0=Math.sin(st.th*Math.PI/180),N=st.N;
+ x.fillStyle=tok('--blue-soft');x.fillRect(X(-1),T,X(1)-X(-1),h-T-B);x.font=font();x.fillStyle=tok('--muted');x.strokeStyle=tok('--rule');x.lineWidth=1;
+ for(let u=-3;u<=3;u++){x.beginPath();x.moveTo(X(u),T);x.lineTo(X(u),h-B);x.stroke();x.textAlign='center';x.textBaseline='top';x.fillText(u===0?'sin θ = 0':minus(u),X(u),h-B+6);}
+ [0,0.5,1].forEach(v=>{x.textAlign='right';x.textBaseline='middle';x.fillText(v.toFixed(1),L-6,Y(v));});
+ x.setLineDash([4,4]);x.strokeStyle=tok('--faint');for(let m=-12;m<=12;m++){const p=u0+m*lam/d;if(p<U0||p>U1)continue;x.beginPath();x.moveTo(X(p),T);x.lineTo(X(p),h-B);x.stroke();}x.setLineDash([]);
+ x.strokeStyle=tok('--accent');x.lineWidth=2;x.beginPath();for(let i=0;i<=1500;i++){const u=U0+i*(U1-U0)/1500,psi=2*Math.PI*d*(u-u0)/lam,den=Math.sin(psi/2),a=Math.abs(den)<1e-9?1:Math.sin(N*psi/2)/(N*den);i?x.lineTo(X(u),Y(a*a)):x.moveTo(X(u),Y(a*a));}x.stroke();}
+function stats(){const d=st.d/1000,N=st.N,s0=Math.abs(Math.sin(st.th*Math.PI/180)),lam=C/st.f,fmin=C/(N*d),fmax=C/(d*(1+s0));
+ let gl=0;for(let m=-12;m<=12;m++){if(m&&Math.abs(Math.sin(st.th*Math.PI/180)+m*lam/d)<=1)gl++;}
+ $('w3s').innerHTML=statHTML([['f_min = c/(N·d)',fmtF(fmin)],['f_max, simple',fmtF(fmax)],['f_max, with lobe width',fmtF(fmax*(1-0.443/N))],['Both nulls visible above',s0<1?fmtF(fmin/(1-s0)):'—'],['At this frequency',gl?'Grating lobe visible':(lam/(N*d)<=1?'Clean steered beam':'No null, no real beam')]]);}
+function sync(){st.f=Math.round(fmap(+$('w3f').value)/10)*10;st.th=+$('w3th').value;st.d=+$('w3d').value;st.N=+$('w3n').value;$('w3fv').textContent=fmtF(st.f);$('w3thv').textContent=minus(st.th)+'°';$('w3dv').textContent=st.d+' mm';$('w3nv').textContent=st.N;stats();draw();}
+['w3f','w3th','w3d','w3n'].forEach(id=>$(id).addEventListener('input',sync));watch(cv.parentElement,draw);onTheme(draw);sync();
+})();
+
+/* W4: spacing sweep */
+(function(){
+const cv=$('w4c');let N=6,TH=45,hv=null;const D0=20,D1=120,F0=150,F1=15000;
+const s=()=>Math.sin(TH*Math.PI/180),fmin=d=>C/(N*d/1000),fmax=d=>C*(1-0.443/N)/(d/1000*(1+s())),dsw=()=>C*(1-0.443/N)/(4000*(1+s()))*1000;
+let geo=null;
+function draw(){const {w,h,ctx:x}=fit(cv,0.52,260);x.clearRect(0,0,w,h);const L=54,R=12,T=12,B=34,X=d=>L+(d-D0)/(D1-D0)*(w-L-R),Y=f=>T+(1-Math.log(Math.min(F1,Math.max(F0,f))/F0)/Math.log(F1/F0))*(h-T-B);geo={L,R,w};
+ x.fillStyle=tok('--blue-soft');x.fillRect(L,Y(4000),w-L-R,Y(200)-Y(4000));
+ x.fillStyle=tok('--accent-soft');x.strokeStyle=tok('--accent');x.lineWidth=2;x.beginPath();for(let d=D0;d<=D1;d+=0.5)x.lineTo(X(d),Y(fmax(d)));for(let d=D1;d>=D0;d-=0.5)x.lineTo(X(d),Y(fmin(d)));x.closePath();x.globalAlpha=0.85;x.fill();x.globalAlpha=1;
+ x.font=font();x.fillStyle=tok('--muted');x.strokeStyle=tok('--rule');x.lineWidth=1;
+ [200,500,1000,2000,4000,10000].forEach(f=>{x.beginPath();x.moveTo(L,Y(f));x.lineTo(w-R,Y(f));x.stroke();x.textAlign='right';x.textBaseline='middle';x.fillText(fmtF(f),L-6,Y(f));});
+ for(let d=20;d<=120;d+=20){x.beginPath();x.moveTo(X(d),T);x.lineTo(X(d),h-B);x.stroke();x.textAlign='center';x.textBaseline='top';x.fillText(d+' mm',X(d),h-B+6);}
+ [[fmin,tok('--faint')],[fmax,tok('--accent')]].forEach(([fn,col])=>{x.strokeStyle=col;x.lineWidth=2;x.beginPath();for(let d=D0;d<=D1;d+=0.5)d===D0?x.moveTo(X(d),Y(fn(d))):x.lineTo(X(d),Y(fn(d)));x.stroke();});
+ const sw=dsw();x.setLineDash([5,4]);x.strokeStyle=tok('--teal');x.lineWidth=1.5;x.beginPath();x.moveTo(X(sw),T);x.lineTo(X(sw),h-B);x.stroke();x.setLineDash([]);
+ x.strokeStyle=tok('--ink');x.lineWidth=1.5;x.beginPath();x.moveTo(X(50),T);x.lineTo(X(50),h-B);x.stroke();
+ x.fillStyle=tok('--ink');x.textAlign='left';x.textBaseline='top';x.fillText('clean to 4 kHz up to '+sw.toFixed(1)+' mm',X(Math.max(sw,50))+6,T+4);
+ if(hv!==null){x.strokeStyle=tok('--muted');x.setLineDash([2,3]);x.lineWidth=1;x.beginPath();x.moveTo(X(hv),T);x.lineTo(X(hv),h-B);x.stroke();x.setLineDash([]);}}
+function read(d){const Lp=(N-1)*d/1000;$('w4r').textContent='d = '+d+' mm | beam forms > '+Math.round(fmin(d))+' Hz | clean < '+Math.round(fmax(d))+' Hz | '+(fmax(d)>=4000?'no grating lobe below 4 kHz':'grating lobes from '+Math.round(fmax(d))+' Hz')+' | far field at 4 kHz '+(2*Lp*Lp/(C/4000)).toFixed(2)+' m';}
+function pick(e){if(!geo)return;const r=cv.getBoundingClientRect();const d=D0+(e.clientX-r.left-geo.L)/(r.width-geo.L-geo.R)*(D1-D0);hv=Math.round(Math.max(D0,Math.min(D1,d)));read(hv);draw();}
+cv.addEventListener('pointermove',pick);cv.addEventListener('pointerdown',pick);cv.addEventListener('pointerleave',()=>{hv=null;draw();});
+segBind($('w4n'),'n',n=>{N=+n;if(hv!==null)read(hv);draw();});segBind($('w4t'),'t',t=>{TH=+t;if(hv!==null)read(hv);draw();});
+watch(cv.parentElement,draw);onTheme(draw);read(50);draw();
+})();
+
+/* W5: heatmaps */
+(function(){
+const N=6,d=0.05,a=0.02,Lap=(N-1)*d,NA=361,xs=[];for(let n=0;n<N;n++)xs.push((n-(N-1)/2)*d);
+const st={th:45,f:3000,r:1},FA0=300,FA1=12000,RB0=0.1,RB1=5,RA=180,RBn=150,fmap=logMap(300,10000),rmap=v=>+(0.1*Math.pow(50,v/1000)).toFixed(2);
+let A=null,B=null;const M={L:52,R:10,T:8,B:26};
+function farRow(f,s0,o){const k=2*Math.PI*f/C,lam=C/f;let mx=0;for(let i=0;i<NA;i++){const s=Math.sin((-90+i*0.5)*Math.PI/180);let re=0,im=0;for(const x of xs){const p=k*x*(s-s0);re+=Math.cos(p);im+=Math.sin(p);}const u=Math.PI*a*s/lam,e=Math.abs(u)<1e-9?1:Math.sin(u)/u,v=e*e*(re*re+im*im);o[i]=v;if(v>mx)mx=v;}for(let i=0;i<NA;i++)o[i]/=mx;}
+function nearRow(f,s0,r,o){const k=2*Math.PI*f/C;let mx=0;for(let i=0;i<NA;i++){const t=(-90+i*0.5)*Math.PI/180,px=r*Math.sin(t),py=r*Math.cos(t);let re=0,im=0;for(const x of xs){const R=Math.hypot(px-x,py),p=k*R+k*x*s0;re+=Math.cos(p)/R;im+=Math.sin(p)/R;}const v=re*re+im*im;o[i]=v;if(v>mx)mx=v;}for(let i=0;i<NA;i++)o[i]/=mx;}
+const fA=j=>FA0*Math.pow(FA1/FA0,(RA-1-j)/(RA-1)),rB=j=>RB0*Math.pow(RB1/RB0,(RBn-1-j)/(RBn-1));
+function compA(){const s0=Math.sin(st.th*Math.PI/180);A=[];for(let j=0;j<RA;j++){const o=new Float32Array(NA);farRow(fA(j),s0,o);A.push(o);}}
+function compB(){const s0=Math.sin(st.th*Math.PI/180);B=[];for(let j=0;j<RBn;j++){const o=new Float32Array(NA);nearRow(st.f,s0,rB(j),o);B.push(o);}}
+function toImg(Mx){const o=document.createElement('canvas');o.width=NA;o.height=Mx.length;const g=o.getContext('2d'),im=g.createImageData(NA,Mx.length),D=im.data;for(let j=0;j<Mx.length;j++)for(let i=0;i<NA;i++){const db=10*Math.log10(Math.max(Mx[j][i],1e-6)),v=Math.max(0,Math.min(1,(db+25)/25)),q=(j*NA+i)*4;D[q]=216;D[q+1]=90;D[q+2]=48;D[q+3]=Math.round(255*Math.pow(v,1.3));}g.putImageData(im,0,0);return o;}
+function frame(x,w,h,ticks,yOf){x.font=font();x.fillStyle=tok('--muted');x.strokeStyle=tok('--rule');x.lineWidth=1;x.strokeRect(M.L,M.T,w-M.L-M.R,h-M.T-M.B);
+ [-90,-45,0,45,90].forEach(t=>{const px=M.L+(t+90)/180*(w-M.L-M.R);x.textAlign='center';x.textBaseline='top';x.fillText(minus(t)+'°',px,h-M.B+6);});ticks.forEach(([v,l])=>{x.textAlign='right';x.textBaseline='middle';x.fillText(l,M.L-6,yOf(v));});}
+function hline(x,w,y,col,dash,lab,lw){x.setLineDash(dash);x.strokeStyle=col;x.lineWidth=lw||1.2;x.beginPath();x.moveTo(M.L,y);x.lineTo(w-M.R,y);x.stroke();x.setLineDash([]);if(lab){x.fillStyle=col;x.textAlign='right';x.textBaseline='bottom';x.fillText(lab,w-M.R-4,y-2);}}
+function vline(x,w,h,t){const px=M.L+(t+90)/180*(w-M.L-M.R);x.setLineDash([5,4]);x.strokeStyle=tok('--ink');x.lineWidth=1;x.beginPath();x.moveTo(px,M.T);x.lineTo(px,h-M.B);x.stroke();x.setLineDash([]);}
+function drawA(){if(!A)return;const {w,h,ctx:x}=fit($('w5a'),0.5,220,340);x.clearRect(0,0,w,h);x.imageSmoothingEnabled=true;x.drawImage(toImg(A),M.L,M.T,w-M.L-M.R,h-M.T-M.B);
+ const yOf=f=>M.T+(1-Math.log(f/FA0)/Math.log(FA1/FA0))*(h-M.T-M.B);frame(x,w,h,[[300,'300 Hz'],[1000,'1 kHz'],[2000,'2 kHz'],[4000,'4 kHz'],[8000,'8 kHz']],yOf);vline(x,w,h,st.th);
+ const s0=Math.abs(Math.sin(st.th*Math.PI/180)),ink=tok('--ink'),fmn=C/(N*d),fmx=C*(1-0.443/N)/(d*(1+s0));
+ hline(x,w,yOf(fmn),ink,[2,3],'beam forms '+fmtF(fmn));hline(x,w,yOf(fmx),ink,[2,3],'grating lobe enters '+fmtF(fmx));hline(x,w,yOf(st.f),tok('--blue'),[],'',2);}
+function drawB(){if(!B)return;const {w,h,ctx:x}=fit($('w5b'),0.5,220,340);x.clearRect(0,0,w,h);x.imageSmoothingEnabled=true;x.drawImage(toImg(B),M.L,M.T,w-M.L-M.R,h-M.T-M.B);
+ const yOf=r=>M.T+(1-Math.log(r/RB0)/Math.log(RB1/RB0))*(h-M.T-M.B);frame(x,w,h,[[0.1,'0.1 m'],[0.25,'0.25 m'],[0.5,'0.5 m'],[1,'1 m'],[2,'2 m'],[5,'5 m']],yOf);vline(x,w,h,st.th);
+ const ink=tok('--ink'),rff=2*Lap*Lap/(C/st.f);hline(x,w,yOf(Lap),ink,[2,3],'L');hline(x,w,yOf(2*Lap),ink,[2,3],'2L');if(rff>RB0&&rff<RB1)hline(x,w,yOf(rff),ink,[2,3],'2L²/λ = '+rff.toFixed(2)+' m');hline(x,w,yOf(st.r),tok('--blue'),[],'',2);}
+function stats(){const s0=Math.sin(st.th*Math.PI/180),o=new Float32Array(NA);nearRow(st.f,s0,st.r,o);let pi=0;for(let i=1;i<NA;i++)if(o[i]>o[pi])pi=i;let l=pi,r=pi;while(l>0&&o[l]>0.5)l--;while(r<NA-1&&o[r]>0.5)r++;
+ const rff=2*Lap*Lap/(C/st.f);$('w5s').innerHTML=statHTML([['Beam peak at listener',minus((-90+pi*0.5).toFixed(1))+'°'],['−3 dB width at listener',(l===0||r===NA-1)?'reaches ±90°':((r-l)*0.5).toFixed(1)+'°'],['Far field, broadside',rff.toFixed(2)+' m'],['Far field along θ₀',(rff*Math.cos(st.th*Math.PI/180)**2).toFixed(2)+' m'],['Level vs 1 m',minus((20*Math.log10(1/st.r)).toFixed(1))+' dB']]);}
+function labels(){$('w5thv').textContent=minus(st.th)+'°';$('w5fv').textContent=fmtF(st.f);$('w5rv').textContent=st.r.toFixed(2)+' m';}
+$('w5th').addEventListener('input',()=>{st.th=+$('w5th').value;labels();compA();compB();drawA();drawB();stats();});
+$('w5f').addEventListener('input',()=>{st.f=Math.round(fmap(+$('w5f').value)/10)*10;labels();compB();drawA();drawB();stats();});
+$('w5r').addEventListener('input',()=>{st.r=rmap(+$('w5r').value);labels();drawB();stats();});
+st.f=Math.round(fmap(+$('w5f').value)/10)*10;st.r=rmap(+$('w5r').value);labels();compA();compB();
+watch($('w5'),()=>{drawA();drawB();});onTheme(()=>{drawA();drawB();});stats();
+})();
+})();
+</script>
