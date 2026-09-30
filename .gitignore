@@ -5,6 +5,12 @@ slprj/
 codegen/
 *.mex*
 
+# ---- LTSpice ----
+*.txt
+*.op.raw
+*.log
+*.raw
+
 # ---- OS / editor ----
 Thumbs.db
 .DS_Store
