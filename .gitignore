@@ -10,6 +10,7 @@ codegen/
 *.op.raw
 *.log
 *.raw
+*.net
 
 # ---- OS / editor ----
 Thumbs.db
