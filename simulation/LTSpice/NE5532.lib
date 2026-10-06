@@ -1,0 +1,49 @@
+* NE5532 behavioural macro-model (one amplifier of the dual)
+* Written from typical values in the TI datasheet SLOS075K (Rev. K).
+* Not a vendor model. Pin order matches the LTspice "opamp2" symbol:
+*               non-inverting input
+*               |   inverting input
+*               |   |   positive supply
+*               |   |   |   negative supply
+*               |   |   |   |   output
+.subckt NE5532  inp inn vcc vee out
+* --- mid-supply reference
+Bmid mid 0 V=(V(vcc)+V(vee))/2
+* --- input: offset 0.5 mV, voltage noise 5 nV/rtHz
+Vos  inp p   0.5m
+Rnv  nv  0   1.51k
+Env  p   pn  nv 0 1
+* --- input bias current 200 nA (flows into the pins), offset current 10 nA
+Ibp  pn  vee 205n
+Ibn  inn vee 195n
+* --- current noise 0.7 pA/rtHz per input
+Rnp  np  0   1k
+Gnp  pn  0   np 0 172u
+Rnn  nn  0   1k
+Gnn  inn 0   nn 0 172u
+* --- differential input resistance and protection diodes (about 0.6 V)
+Rin  pn  inn 300k
+Dp   pn  inn DIN
+Dn   inn pn  DIN
+* --- gain stage: Avol 100 V/mV, GBW 10 MHz, slew 5 V/us, CMRR and PSRR 100 dB
+B1   mid g1  I=500u*tanh(12.566*(V(pn,inn)+10u*((V(pn)+V(inn))/2-V(mid))+10u*(V(vcc,vee)-30)))
+R1   g1  mid 15.92Meg
+C1   g1  mid 100p
+* --- output swing limit: 2 V inside each rail
+Vhi  vcc chi 2.05
+Dhi  g1  chi DCL
+Vlo  clo vee 2.05
+Dlo  clo g1  DCL
+* --- second pole at 30 MHz
+E2   e2  mid g1 mid 1
+R2   e2  g2  1k
+C2   g2  mid 5.3p
+* --- output stage: 10 ohm open-loop, 38 mA current limit, current drawn from the rails
+Bio  io  0   V=38m*tanh((V(g2)-V(out))/0.38)
+Bop  vcc out I=uramp(V(io))
+Bon  out vee I=uramp(-V(io))
+* --- quiescent supply current, 3 mA per amplifier
+Bq   vcc vee I=3m*tanh(V(vcc,vee))
+.model DIN D(Is=1e-14 Rs=10)
+.model DCL D(Is=1e-12 N=0.1)
+.ends NE5532
